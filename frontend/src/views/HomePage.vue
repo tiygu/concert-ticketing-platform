@@ -22,6 +22,24 @@
         </el-input>
       </section>
 
+      <section v-loading="noticesLoading" class="notices-section" element-loading-background="rgba(26, 26, 46, 0.72)">
+        <div class="section-header">
+          <h2>最新公告</h2>
+        </div>
+        <el-row v-if="notices.length" :gutter="24" class="notice-grid">
+          <el-col v-for="notice in notices" :key="notice.id" :xs="24" :sm="12" :md="8">
+            <el-card class="notice-card" shadow="never">
+              <div class="notice-header">
+                <h3>{{ notice.title }}</h3>
+                <span class="notice-time">{{ formatDate(notice.publishTime) }}</span>
+              </div>
+              <p class="notice-content">{{ notice.content }}</p>
+            </el-card>
+          </el-col>
+        </el-row>
+        <el-empty v-else-if="!noticesLoading" description="暂无公告" :image-size="80" />
+      </section>
+
       <section v-loading="loading" class="shows-shell" element-loading-background="rgba(26, 26, 46, 0.72)">
         <el-row v-if="shows.length" :gutter="24" class="show-grid">
           <el-col v-for="show in shows" :key="show.id" :xs="24" :sm="24" :md="12" :lg="8">
@@ -86,12 +104,15 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import { getShows, type ShowItem } from '../api/shows'
+import { getNotices, type NoticeItem } from '../api/notices'
 
 const router = useRouter()
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
 
 const shows = ref<ShowItem[]>([])
+const notices = ref<NoticeItem[]>([])
 const loading = ref(false)
+const noticesLoading = ref(false)
 const keyword = ref('')
 const page = ref(1)
 const pageSize = ref(9)
@@ -138,7 +159,7 @@ function statusTagType(show: ShowItem) {
   return 'info'
 }
 
-function formatDate(value: string) {
+function formatDate(value: string | null) {
   if (!value) {
     return '时间待定'
   }
@@ -203,13 +224,28 @@ async function fetchShows() {
   }
 }
 
+async function fetchNotices() {
+  noticesLoading.value = true
+  try {
+    const response = await getNotices()
+    notices.value = response.data.data || []
+  } catch (error) {
+    notices.value = []
+  } finally {
+    noticesLoading.value = false
+  }
+}
+
 function goToShow(id: number) {
   router.push(`/shows/${id}`)
 }
 
 watch(keyword, scheduleSearch)
 
-onMounted(fetchShows)
+onMounted(() => {
+  fetchShows()
+  fetchNotices()
+})
 
 onUnmounted(() => {
   if (searchTimer) {
@@ -271,6 +307,77 @@ onUnmounted(() => {
   color: #e94560;
   font-size: 22px;
   font-weight: 800;
+}
+
+.notices-section {
+  max-width: 1240px;
+  margin: 0 auto 48px;
+}
+
+.section-header {
+  margin-bottom: 24px;
+}
+
+.section-header h2 {
+  margin: 0;
+  color: #fff;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.notice-grid {
+  row-gap: 20px;
+}
+
+.notice-card {
+  height: 100%;
+  border: 1px solid rgba(255, 215, 0, 0.15);
+  border-radius: 16px;
+  background: linear-gradient(145deg, rgba(255, 215, 0, 0.08), rgba(255, 255, 255, 0.02));
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  transition: transform 0.24s ease, box-shadow 0.24s ease;
+}
+
+.notice-card:hover {
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.25);
+  transform: translateY(-4px);
+}
+
+.notice-card :deep(.el-card__body) {
+  padding: 20px;
+}
+
+.notice-header {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.notice-header h3 {
+  margin: 0;
+  color: #ffd700;
+  font-size: 18px;
+  line-height: 1.4;
+}
+
+.notice-time {
+  flex: 0 0 auto;
+  color: rgba(238, 238, 238, 0.6);
+  font-size: 13px;
+}
+
+.notice-content {
+  margin: 0;
+  color: rgba(238, 238, 238, 0.85);
+  font-size: 14px;
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .shows-shell {

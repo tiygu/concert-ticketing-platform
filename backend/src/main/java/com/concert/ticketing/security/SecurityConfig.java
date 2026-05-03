@@ -46,6 +46,7 @@ public class SecurityConfig {
                 .authorizeRequests()
                 .antMatchers("/api/auth/**").permitAll()
                 .antMatchers(HttpMethod.GET, "/api/shows/**").permitAll()
+                .antMatchers(HttpMethod.GET, "/api/notices/**").permitAll()
                 .antMatchers("/uploads/**").permitAll()
                 .antMatchers("/doc.html", "/swagger-resources/**", "/webjars/**", "/v2/api-docs/**").permitAll()
                 .antMatchers("/api/admin/**").hasRole("ADMIN")

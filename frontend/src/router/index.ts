@@ -3,6 +3,30 @@ import HomePage from '../views/HomePage.vue'
 
 const routes: Array<RouteRecordRaw> = [
   {
+    path: '/orders',
+    name: 'OrderList',
+    component: () => import('../views/OrderList.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/orders/:id',
+    name: 'OrderDetail',
+    component: () => import('../views/OrderDetail.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/admin/users',
+    name: 'UserManage',
+    component: () => import('../views/admin/UserManage.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true }
+  },
+  {
+    path: '/profile',
+    name: 'Profile',
+    component: () => import('../views/ProfilePage.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/',
     name: 'Home',
     component: HomePage,
@@ -18,6 +42,18 @@ const routes: Array<RouteRecordRaw> = [
     path: '/admin/shows',
     name: 'ShowManage',
     component: () => import('../views/admin/ShowManage.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true }
+  },
+  {
+    path: '/admin/notices',
+    name: 'NoticeManage',
+    component: () => import('../views/admin/NoticeManage.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true }
+  },
+  {
+    path: '/admin/vip/packages',
+    name: 'VipPackageManage',
+    component: () => import('../views/admin/VipPackageManage.vue'),
     meta: { requiresAuth: true, requiresAdmin: true }
   },
   {

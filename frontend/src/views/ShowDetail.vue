@@ -53,9 +53,20 @@
           </section>
 
           <section class="content-section">
-            <h2>座位分区</h2>
-            <pre v-if="formattedSeatZones" class="seat-zones">{{ formattedSeatZones }}</pre>
-            <div v-else class="empty-zone">座位信息暂未配置</div>
+            <h2>选座购票</h2>
+            <div v-if="seats.length" class="seat-map">
+              <div v-for="seat in seats" :key="seat.id" 
+                   class="seat-cell" 
+                   :class="{ available: seat.available, selected: selectedSeatId === seat.id, sold: !seat.available }"
+                   @click="selectSeat(seat)">
+                {{ seat.seatNumber }}
+              </div>
+            </div>
+            <div v-else class="empty-zone">座位信息加载中...</div>
+            <div v-if="selectedSeatId" class="seat-action-bar">
+              <span>已选: {{ selectedSeat?.seatNumber }} - ¥{{ selectedSeat?.price }}</span>
+              <el-button type="primary" @click="confirmOrder" :loading="ordering">确认购票</el-button>
+            </div>
           </section>
 
           <el-button class="back-button" size="large" @click="goHome">返回首页</el-button>
@@ -68,8 +79,10 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import { getShow, type ShowItem } from '../api/shows'
+import { getShowSeats, createOrder, type SeatItem } from '../api/orders'
 
 const route = useRoute()
 const router = useRouter()
@@ -79,8 +92,13 @@ const show = ref<ShowItem | null>(null)
 const loading = ref(false)
 const error = ref(false)
 
+const seats = ref<SeatItem[]>([])
+const selectedSeatId = ref<number | null>(null)
+const ordering = ref(false)
+
+const selectedSeat = computed(() => seats.value.find(s => s.id === selectedSeatId.value))
+
 const coverUrl = computed(() => resolveCoverImage(show.value?.coverImage || null))
-const formattedSeatZones = computed(() => formatSeatZones(show.value?.seatZones || null))
 
 function resolveCoverImage(coverImage: string | null) {
   if (!coverImage) {
@@ -147,17 +165,6 @@ function formatPrice(value: number) {
   return `¥${Number(value || 0).toFixed(2)}`
 }
 
-function formatSeatZones(value: string | null) {
-  if (!value) {
-    return ''
-  }
-  try {
-    return JSON.stringify(JSON.parse(value), null, 2)
-  } catch {
-    return value
-  }
-}
-
 async function fetchShow() {
   const id = Number(route.params.id)
   if (!Number.isFinite(id)) {
@@ -170,11 +177,61 @@ async function fetchShow() {
   try {
     const response = await getShow(id)
     show.value = response.data.data
+    await fetchSeats(id)
   } catch {
     show.value = null
     error.value = true
   } finally {
     loading.value = false
+  }
+}
+
+async function fetchSeats(showId: number) {
+  try {
+    const res = await getShowSeats(showId)
+    seats.value = res.data.data || []
+  } catch (err) {
+    console.error('Failed to fetch seats', err)
+  }
+}
+
+function selectSeat(seat: SeatItem) {
+  if (!seat.available) return
+  if (selectedSeatId.value === seat.id) {
+    selectedSeatId.value = null
+  } else {
+    selectedSeatId.value = seat.id
+  }
+}
+
+async function confirmOrder() {
+  if (!selectedSeat.value || !show.value) return
+  
+  try {
+    await ElMessageBox.confirm(
+      `确认购买 ${selectedSeat.value.seatNumber} 座位？\n价格: ¥${selectedSeat.value.price}`,
+      '确认购票',
+      {
+        confirmButtonText: '确认',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
+    ordering.value = true
+    const res = await createOrder({
+      showId: show.value.id,
+      ticketId: selectedSeat.value.id
+    })
+    
+    ElMessage.success(`购票成功！订单号: ${res.data.data.orderNo}`)
+    router.push('/orders')
+  } catch (err: any) {
+    if (err !== 'cancel') {
+      ElMessage.error(err.response?.data?.message || '购票失败')
+    }
+  } finally {
+    ordering.value = false
   }
 }
 
@@ -325,6 +382,63 @@ h1 {
 
 .empty-zone {
   color: rgba(238, 238, 238, 0.68);
+}
+
+.seat-map {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+  gap: 8px;
+  max-width: 600px;
+}
+
+.seat-cell {
+  width: 60px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  transition: background 0.2s, border 0.2s, box-shadow 0.2s, color 0.2s;
+}
+
+.seat-cell.available {
+  background: rgba(76, 175, 80, 0.35);
+  border: 1px solid rgba(76, 175, 80, 0.6);
+  color: #a5d6a7;
+}
+
+.seat-cell.available:hover {
+  background: rgba(76, 175, 80, 0.5);
+}
+
+.seat-cell.sold {
+  background: rgba(158, 158, 158, 0.2);
+  border: 1px solid rgba(158, 158, 158, 0.3);
+  color: rgba(238, 238, 238, 0.35);
+  cursor: not-allowed;
+}
+
+.seat-cell.selected {
+  background: rgba(255, 215, 0, 0.35);
+  border: 2px solid #ffd700;
+  box-shadow: 0 0 12px rgba(255, 215, 0, 0.4);
+  color: #ffd700;
+}
+
+.seat-action-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 20px;
+  padding: 16px 20px;
+  border: 1px solid rgba(255, 215, 0, 0.3);
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.24);
+  color: #eee;
+  font-size: 15px;
 }
 
 .back-button {
