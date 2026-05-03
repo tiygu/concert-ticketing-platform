@@ -1,4 +1,5 @@
 import request from '../utils/request'
+import type { ApiResult, PageResult } from '@/types/api'
 
 export interface VipBookingItem {
   id: number
@@ -18,19 +19,6 @@ export interface VipBookingItem {
 export interface AdminVipBookingItem extends VipBookingItem {
   username: string
   userVipLevel: number
-}
-
-export interface PageResult<T> {
-  records: T[]
-  total: number
-  page: number
-  pageSize: number
-}
-
-export interface ApiResult<T> {
-  code: number
-  message: string
-  data: T
 }
 
 export function createVipBooking(data: { packageId: number; useDate: string }) {

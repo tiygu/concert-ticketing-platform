@@ -1,4 +1,5 @@
 import request from '../utils/request'
+import type { ApiResult } from '@/types/api'
 
 export interface VipPackageItem {
   id: number;
@@ -13,12 +14,6 @@ export interface VipPackageItem {
   statusText: string;
   createdAt: string;
   updatedAt: string;
-}
-
-export interface ApiResult<T> {
-  code: number;
-  message: string;
-  data: T;
 }
 
 export function getVipPackages() {

@@ -1,258 +1,91 @@
 <template>
-  <el-config-provider :locale="zhCn">
-    <main class="vip-center-page">
-      <section class="hero-section">
-        <div class="hero-copy">
-          <p class="eyebrow">VIP PRIVILEGES</p>
-          <h1>VIP权益中心</h1>
-          <p class="hero-subtitle">专属权益，尊享体验</p>
+  <UserLayout>
+    <div class="max-w-4xl mx-auto">
+      <div class="mb-8">
+        <p class="text-neon-pink text-sm font-bold tracking-widest mb-2">VIP CENTER</p>
+        <h1 class="font-orbitron text-4xl font-black">VIP 权益中心</h1>
+        <p class="text-gray-400 mt-2">浏览可用的VIP专属权益套餐，选择您感兴趣的权益进行预约</p>
+      </div>
+
+      <LoadingOverlay v-if="loading" />
+      <div v-else-if="packages.length" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div v-for="pkg in packages" :key="pkg.id" class="glass-card rounded-2xl p-6">
+          <div class="flex justify-between items-start mb-4">
+            <div>
+              <h3 class="text-xl font-bold">{{ pkg.packageName }}</h3>
+              <p class="text-xs text-gray-400 mt-1">所需等级: V{{ pkg.userLevelRequired }}</p>
+            </div>
+            <StatusTag :type="pkg.stock === null || (pkg.stock - pkg.bookedCount) > 0 ? 'success' : 'danger'" :label="pkg.stock === null || (pkg.stock - pkg.bookedCount) > 0 ? '可预约' : '已满' " />
+          </div>
+          <p class="text-sm text-gray-400 mb-4 line-clamp-3">{{ pkg.benefits || '权益详情请查看套餐说明' }}</p>
+          <div class="text-sm text-gray-500 mb-4 space-y-1">
+            <p v-if="pkg.usageLimit">使用限制: {{ pkg.usageLimit }}</p>
+            <p v-if="pkg.validPeriod">有效期: {{ pkg.validPeriod }}</p>
+            <p v-if="pkg.stock !== null">名额: {{ pkg.bookedCount || 0 }} / {{ pkg.stock }}</p>
+          </div>
+
+          <div v-if="bookingPkgId === pkg.id" class="space-y-3">
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">使用日期</label>
+              <input v-model="bookingDate" type="date" class="input-dark" />
+            </div>
+            <div class="flex gap-2">
+              <BaseButton variant="primary" size="sm" :loading="submittingBooking" @click="submitBooking(pkg.id)">确认预约</BaseButton>
+              <BaseButton variant="ghost" size="sm" @click="bookingPkgId = 0">取消</BaseButton>
+            </div>
+          </div>
+          <BaseButton
+            v-else
+            variant="primary"
+            :disabled="pkg.stock !== null && (pkg.stock - (pkg.bookedCount || 0)) <= 0"
+            @click="startBooking(pkg.id)"
+          >
+            立即预约
+          </BaseButton>
         </div>
-      </section>
-
-      <section v-loading="loading" class="packages-section">
-        <div v-if="packages.length" class="package-grid">
-          <el-card v-for="pkg in packages" :key="pkg.id" class="package-card" shadow="hover">
-            <div class="card-header">
-              <h2>{{ pkg.packageName }}</h2>
-              <el-tag :type="isFull(pkg) ? 'info' : 'success'" effect="light" round>
-                {{ isFull(pkg) ? '已满' : '可预约' }}
-              </el-tag>
-            </div>
-
-            <div class="package-meta">
-              <p class="benefits"><span>权益</span>{{ pkg.benefits }}</p>
-              <p><span>所需等级</span>VIP {{ pkg.userLevelRequired }}</p>
-              <p><span>有效期</span>{{ pkg.validPeriod }}</p>
-              <p><span>使用限制</span>{{ pkg.usageLimit }}</p>
-            </div>
-
-            <div class="stock-row">
-              <span>预约进度</span>
-              <strong>{{ pkg.bookedCount }} / {{ pkg.stock }}</strong>
-            </div>
-
-            <div class="action-row">
-              <el-date-picker
-                v-model="useDateMap[pkg.id]"
-                type="date"
-                placeholder="选择使用日期"
-                format="YYYY-MM-DD"
-                value-format="YYYY-MM-DD"
-                :disabled="isFull(pkg) || submittingId === pkg.id"
-                class="date-picker"
-              />
-              <el-button
-                type="primary"
-                :disabled="isFull(pkg) || !useDateMap[pkg.id]"
-                :loading="submittingId === pkg.id"
-                @click="submitBooking(pkg)"
-              >
-                立即预约
-              </el-button>
-            </div>
-          </el-card>
-        </div>
-        <el-empty v-else-if="!loading" description="暂无可预约的VIP权益" />
-      </section>
-    </main>
-  </el-config-provider>
+      </div>
+      <EmptyState v-else description="暂无可用的VIP套餐" />
+    </div>
+  </UserLayout>
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
-import zhCn from 'element-plus/es/locale/lang/zh-cn'
+import { ref, onMounted } from 'vue'
 import { getAvailableVipPackages, type VipPackageItem } from '../api/vipPackages'
 import { createVipBooking } from '../api/vipBookings'
+import { useToast } from '../composables/useToast'
+import UserLayout from '../components/UserLayout.vue'
+import StatusTag from '../components/StatusTag.vue'
+import EmptyState from '../components/EmptyState.vue'
+import LoadingOverlay from '../components/LoadingOverlay.vue'
+import BaseButton from '../components/BaseButton.vue'
 
+const toast = useToast()
 const packages = ref<VipPackageItem[]>([])
-const loading = ref(false)
-const submittingId = ref<number | null>(null)
-const useDateMap = reactive<Record<number, string>>({})
+const loading = ref(true)
+const bookingPkgId = ref(0)
+const bookingDate = ref(new Date().toISOString().slice(0, 10))
+const submittingBooking = ref(false)
 
-function remainingStock(pkg: VipPackageItem): number {
-  return (pkg.stock || 0) - (pkg.bookedCount || 0)
+function startBooking(id: number) {
+  bookingPkgId.value = id
+  bookingDate.value = new Date().toISOString().slice(0, 10)
 }
 
-function isFull(pkg: VipPackageItem): boolean {
-  return remainingStock(pkg) <= 0
+async function submitBooking(packageId: number) {
+  submittingBooking.value = true
+  try {
+    await createVipBooking({ packageId, useDate: bookingDate.value })
+    toast.success('预约成功，请等待管理员审核')
+    bookingPkgId.value = 0
+  } catch { toast.error('预约失败') }
+  finally { submittingBooking.value = false }
 }
 
-async function fetchPackages() {
+onMounted(async () => {
   loading.value = true
-  try {
-    const response = await getAvailableVipPackages()
-    packages.value = response.data.data || []
-  } catch (error: any) {
-    packages.value = []
-    ElMessage.error(error.response?.data?.message || '权益列表加载失败')
-  } finally {
-    loading.value = false
-  }
-}
-
-async function submitBooking(pkg: VipPackageItem) {
-  const useDate = useDateMap[pkg.id]
-  if (!useDate) return
-
-  submittingId.value = pkg.id
-  try {
-    await createVipBooking({
-      packageId: pkg.id,
-      useDate
-    })
-    ElMessage.success('预约成功，请等待管理员审核')
-    useDateMap[pkg.id] = '' // clear date
-    await fetchPackages() // refresh stock
-  } catch (error: any) {
-    ElMessage.error(error.response?.data?.message || '预约失败')
-  } finally {
-    submittingId.value = null
-  }
-}
-
-onMounted(fetchPackages)
+  try { packages.value = (await getAvailableVipPackages()).data.data || [] }
+  catch { toast.error('加载失败') }
+  finally { loading.value = false }
+})
 </script>
-
-<style scoped>
-.vip-center-page {
-  min-height: 100vh;
-  padding: 48px clamp(20px, 5vw, 72px);
-  background: #f5f7fb;
-  color: #1f2937;
-}
-
-.hero-section {
-  max-width: 1240px;
-  margin: 0 auto 40px;
-  text-align: center;
-}
-
-.eyebrow {
-  margin: 0 0 10px;
-  color: #e94560;
-  font-size: 13px;
-  font-weight: 800;
-  letter-spacing: 0.24em;
-}
-
-.hero-copy h1 {
-  margin: 0;
-  color: #111827;
-  font-size: clamp(32px, 6vw, 48px);
-  font-weight: 800;
-  letter-spacing: -0.02em;
-}
-
-.hero-subtitle {
-  margin: 12px 0 0;
-  color: #6b7280;
-  font-size: 18px;
-}
-
-.packages-section {
-  max-width: 1240px;
-  margin: 0 auto;
-  min-height: 300px;
-}
-
-.package-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 24px;
-}
-
-.package-card {
-  border: 0;
-  border-radius: 18px;
-  background: #fff;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.package-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  margin-bottom: 20px;
-}
-
-.card-header h2 {
-  margin: 0;
-  font-size: 20px;
-  color: #111827;
-  line-height: 1.4;
-}
-
-.package-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-bottom: 20px;
-}
-
-.package-meta p {
-  margin: 0;
-  font-size: 14px;
-  color: #4b5563;
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-}
-
-.package-meta span {
-  flex: 0 0 70px;
-  color: #9ca3af;
-  font-weight: 500;
-}
-
-.benefits {
-  line-height: 1.5;
-}
-
-.stock-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px 0;
-  border-top: 1px solid #f3f4f6;
-  border-bottom: 1px solid #f3f4f6;
-  margin-bottom: 20px;
-}
-
-.stock-row span {
-  color: #6b7280;
-  font-size: 14px;
-}
-
-.stock-row strong {
-  color: #111827;
-  font-size: 16px;
-}
-
-.action-row {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.date-picker {
-  width: 100% !important;
-}
-
-@media (max-width: 1024px) {
-  .package-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (max-width: 640px) {
-  .package-grid {
-    grid-template-columns: 1fr;
-  }
-}
-</style>

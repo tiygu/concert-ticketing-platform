@@ -1,4 +1,5 @@
 import request from '../utils/request'
+import type { ApiResult } from '@/types/api'
 
 export interface RevenueDetailItem {
   showId: number
@@ -34,19 +35,6 @@ export interface StockStatsResponse {
   totalCapacity: number
   soldPercentage: number
   details: StockDetailItem[]
-}
-
-export interface ApiResult<T> {
-  code: number
-  message: string
-  data: T
-}
-
-export interface PageResult<T> {
-  records: T[]
-  total: number
-  page: number
-  pageSize: number
 }
 
 export function getRevenueReport(params: { startDate?: string; endDate?: string }) {

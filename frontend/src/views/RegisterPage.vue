@@ -1,123 +1,89 @@
 <template>
-  <div class="register-container">
-    <el-card class="register-card">
-      <template #header>
-        <h2 class="register-title">用户注册</h2>
-      </template>
-      <el-form
-        ref="formRef"
-        :model="form"
-        :rules="rules"
-        label-width="0"
-        size="large"
-        @keyup.enter="handleRegister"
-      >
-        <el-form-item prop="username">
-          <el-input
-            v-model="form.username"
-            placeholder="请输入用户名"
-            prefix-icon="User"
-          />
-        </el-form-item>
-        <el-form-item prop="password">
-          <el-input
-            v-model="form.password"
-            type="password"
-            placeholder="请输入密码（至少6位）"
-            prefix-icon="Lock"
-            show-password
-          />
-        </el-form-item>
-        <el-form-item prop="confirmPassword">
-          <el-input
-            v-model="form.confirmPassword"
-            type="password"
-            placeholder="请确认密码"
-            prefix-icon="Lock"
-            show-password
-          />
-        </el-form-item>
-        <el-form-item prop="phone">
-          <el-input
-            v-model="form.phone"
-            placeholder="请输入手机号"
-            prefix-icon="Phone"
-          />
-        </el-form-item>
-        <el-form-item prop="email">
-          <el-input
-            v-model="form.email"
-            placeholder="请输入邮箱"
-            prefix-icon="Message"
-          />
-        </el-form-item>
-        <el-form-item>
-          <el-button
-            type="primary"
-            class="register-btn"
-            :loading="loading"
-            @click="handleRegister"
-          >
+  <div class="min-h-screen flex items-center justify-center bg-[linear-gradient(135deg,#0a0a0f_0%,#1a0a2e_50%,#0f0f23_100%)]">
+    <div class="relative z-10 w-full max-w-md mx-4">
+      <div class="glass-card rounded-2xl p-8 animate-[fadeIn_0.5s_ease]">
+        <div class="text-center mb-8">
+          <div class="w-16 h-16 rounded-full bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center mx-auto mb-4">
+            <span class="text-white text-2xl font-bold">+</span>
+          </div>
+          <h1 class="font-orbitron text-2xl font-bold neon-glow">STAR TICKET</h1>
+          <p class="text-gray-400 text-sm mt-2">用户注册</p>
+        </div>
+
+        <form @submit.prevent="handleRegister" class="space-y-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-2">用户名</label>
+            <input v-model="form.username" class="input-dark" placeholder="请输入用户名" />
+            <p v-if="errors.username" class="text-red-400 text-xs mt-1">{{ errors.username }}</p>
+          </div>
+
+          <div>
+            <label class="block text-sm text-gray-400 mb-2">密码</label>
+            <input v-model="form.password" type="password" class="input-dark" placeholder="请输入密码（至少6位）" />
+            <p v-if="errors.password" class="text-red-400 text-xs mt-1">{{ errors.password }}</p>
+          </div>
+
+          <div>
+            <label class="block text-sm text-gray-400 mb-2">确认密码</label>
+            <input v-model="form.confirmPassword" type="password" class="input-dark" placeholder="请确认密码" />
+            <p v-if="errors.confirmPassword" class="text-red-400 text-xs mt-1">{{ errors.confirmPassword }}</p>
+          </div>
+
+          <div>
+            <label class="block text-sm text-gray-400 mb-2">手机号</label>
+            <input v-model="form.phone" class="input-dark" placeholder="请输入手机号" />
+            <p v-if="errors.phone" class="text-red-400 text-xs mt-1">{{ errors.phone }}</p>
+          </div>
+
+          <div>
+            <label class="block text-sm text-gray-400 mb-2">邮箱</label>
+            <input v-model="form.email" type="email" class="input-dark" placeholder="请输入邮箱" />
+            <p v-if="errors.email" class="text-red-400 text-xs mt-1">{{ errors.email }}</p>
+          </div>
+
+          <BaseButton variant="primary" size="lg" native-type="submit" :loading="loading" class="w-full">
             注 册
-          </el-button>
-        </el-form-item>
-      </el-form>
-      <div class="register-footer">
-        已有账号？<router-link to="/login">返回登录</router-link>
+          </BaseButton>
+        </form>
+
+        <p class="text-center text-sm text-gray-400 mt-6">
+          已有账号？<router-link to="/login" class="text-cyan-400 hover:underline">返回登录</router-link>
+        </p>
       </div>
-    </el-card>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { useAuthStore } from '../stores/auth'
+import { useToast } from '../composables/useToast'
+import BaseButton from '../components/BaseButton.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
-const formRef = ref<FormInstance>()
-const loading = ref(false)
+const toast = useToast()
 
+const loading = ref(false)
 const form = reactive({
-  username: '',
-  password: '',
-  confirmPassword: '',
-  phone: '',
-  email: ''
+  username: '', password: '', confirmPassword: '', phone: '', email: ''
+})
+const errors = reactive({
+  username: '', password: '', confirmPassword: '', phone: '', email: ''
 })
 
-const validateConfirmPassword = (_rule: unknown, value: string, callback: (error?: Error) => void) => {
-  if (value !== form.password) {
-    callback(new Error('两次输入的密码不一致'))
-  } else {
-    callback()
-  }
-}
-
-const rules: FormRules = {
-  username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
-  password: [
-    { required: true, message: '请输入密码', trigger: 'blur' },
-    { min: 6, message: '密码长度不能少于6位', trigger: 'blur' }
-  ],
-  confirmPassword: [
-    { required: true, message: '请确认密码', trigger: 'blur' },
-    { validator: validateConfirmPassword, trigger: 'blur' }
-  ],
-  phone: [{ required: true, message: '请输入手机号', trigger: 'blur' }],
-  email: [
-    { required: true, message: '请输入邮箱', trigger: 'blur' },
-    { type: 'email', message: '邮箱格式不正确', trigger: 'blur' }
-  ]
+function validate(): boolean {
+  errors.username = form.username.trim() ? '' : '请输入用户名'
+  errors.password = form.password.length >= 6 ? '' : '密码长度不能少于6位'
+  errors.confirmPassword = form.confirmPassword === form.password ? '' : '两次输入的密码不一致'
+  errors.phone = form.phone.trim() ? '' : '请输入手机号'
+  errors.email = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email) ? '' : '请输入有效邮箱'
+  return !errors.username && !errors.password && !errors.confirmPassword && !errors.phone && !errors.email
 }
 
 async function handleRegister() {
-  if (!formRef.value) return
-  const valid = await formRef.value.validate().catch(() => false)
-  if (!valid) return
-
+  if (!validate()) return
   loading.value = true
   const success = await authStore.register({
     username: form.username,
@@ -126,59 +92,11 @@ async function handleRegister() {
     email: form.email
   })
   loading.value = false
-
   if (success) {
-    ElMessage.success('注册成功')
+    toast.success('注册成功')
     router.push('/')
   } else {
-    ElMessage.error('注册失败，用户名可能已存在')
+    toast.error('注册失败，用户名可能已存在')
   }
 }
 </script>
-
-<style scoped>
-.register-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-}
-
-.register-card {
-  width: 420px;
-  border-radius: 8px;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
-}
-
-.register-card :deep(.el-card__header) {
-  text-align: center;
-  border-bottom: none;
-  padding-bottom: 0;
-}
-
-.register-title {
-  margin: 0;
-  font-size: 24px;
-  color: #303133;
-}
-
-.register-btn {
-  width: 100%;
-}
-
-.register-footer {
-  text-align: center;
-  font-size: 14px;
-  color: #909399;
-}
-
-.register-footer a {
-  color: #667eea;
-  text-decoration: none;
-}
-
-.register-footer a:hover {
-  text-decoration: underline;
-}
-</style>

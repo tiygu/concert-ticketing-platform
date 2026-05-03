@@ -1,276 +1,136 @@
 <template>
-  <el-config-provider :locale="zhCn">
-    <main class="manage-page">
-      <section class="toolbar">
-        <div>
-          <p class="eyebrow">ADMIN CONSOLE</p>
-          <h1>VIP套餐管理</h1>
-        </div>
-        <el-button type="primary" size="large" @click="openCreateDialog">新增套餐</el-button>
-      </section>
+  <AdminLayout title="VIP套餐管理">
+    <div class="mb-4 flex justify-end">
+      <BaseButton variant="primary" @click="openDialog()">新增套餐</BaseButton>
+    </div>
 
-      <el-card class="table-card" shadow="never">
-        <el-table v-loading="loading" :data="packages" row-key="id" class="show-table">
-          <el-table-column label="套餐名称" min-width="160" prop="packageName" show-overflow-tooltip />
-          <el-table-column label="权益描述" min-width="200" prop="benefits" show-overflow-tooltip />
-          <el-table-column label="所需等级" width="100" prop="userLevelRequired" />
-          <el-table-column label="库存/已订" width="120">
-            <template #default="{ row }">{{ row.stock }} / {{ row.bookedCount }}</template>
-          </el-table-column>
-          <el-table-column label="状态" width="100">
-            <template #default="{ row }">
-              <el-tag :type="statusTagType(row)" effect="light" round>{{ displayStatus(row) }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" width="160" fixed="right">
-            <template #default="{ row }">
-              <el-button type="primary" link @click="openEditDialog(row)">编辑</el-button>
-              <el-button type="danger" link @click="confirmDelete(row)">删除</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-      </el-card>
-
-      <el-dialog v-model="dialogVisible" :title="editingPackage ? '编辑套餐' : '新增套餐'" width="600px" @closed="resetForm">
-        <el-form ref="formRef" :model="form" :rules="rules" label-width="96px" class="show-form">
-          <el-form-item label="套餐名称" prop="packageName">
-            <el-input v-model="form.packageName" placeholder="请输入套餐名称" />
-          </el-form-item>
-          <el-form-item label="权益描述" prop="benefits">
-            <el-input v-model="form.benefits" type="textarea" :rows="4" placeholder="请输入权益描述" />
-          </el-form-item>
-          <el-form-item label="使用限制" prop="usageLimit">
-            <el-input v-model="form.usageLimit" placeholder="请输入使用限制" />
-          </el-form-item>
-          <el-form-item label="有效期" prop="validPeriod">
-            <el-input v-model="form.validPeriod" placeholder="请输入有效期" />
-          </el-form-item>
-          <el-form-item label="所需等级" prop="userLevelRequired">
-            <el-input-number v-model="form.userLevelRequired" :min="1" :precision="0" class="full-input" />
-          </el-form-item>
-          <el-form-item label="库存" prop="stock">
-            <el-input-number v-model="form.stock" :min="0" :precision="0" class="full-input" />
-          </el-form-item>
-          <el-form-item v-if="editingPackage" label="状态" prop="status">
-            <el-select v-model="form.status" class="full-input">
-              <el-option label="生效中" value="ACTIVE" />
-              <el-option label="已下架" value="INACTIVE" />
-            </el-select>
-          </el-form-item>
-        </el-form>
-
-        <template #footer>
-          <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" :loading="submitting" @click="submitForm">保存</el-button>
+    <div class="glass-card rounded-2xl overflow-hidden">
+      <BaseTable :columns="columns" :data="packages" :loading="loading">
+        <template #cell-userLevelRequired="{ value }"><span class="text-yellow-400 font-bold">V{{ value }}</span></template>
+        <template #cell-status="{ value }">
+          <StatusTag :type="value === 'ACTIVE' ? 'success' : 'danger'" :label="value === 'ACTIVE' ? '上架' : '下架'" />
         </template>
-      </el-dialog>
-    </main>
-  </el-config-provider>
+        <template #cell-actions="{ row }">
+          <div class="flex gap-2">
+            <button class="text-cyan-400 hover:underline text-sm" @click="openDialog(row as any)">编辑</button>
+            <button class="text-red-400 hover:underline text-sm" @click="handleDelete((row as any).id)">删除</button>
+          </div>
+        </template>
+      </BaseTable>
+    </div>
+
+    <BaseDialog v-model="dialogVisible" :title="editingId ? '编辑套餐' : '新增套餐'" width="600px">
+      <form @submit.prevent="handleSave" class="space-y-4">
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">套餐名称</label>
+          <input v-model="form.packageName" class="input-dark" placeholder="请输入套餐名称" />
+        </div>
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">权益描述</label>
+          <textarea v-model="form.benefits" class="input-dark resize-none" rows="3" placeholder="请输入权益内容" />
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">使用限制</label>
+            <input v-model="form.usageLimit" class="input-dark" placeholder="如: 每用户限一次" />
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">有效期限</label>
+            <input v-model="form.validPeriod" class="input-dark" placeholder="如: 购买后30天内" />
+          </div>
+        </div>
+        <div class="grid grid-cols-3 gap-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">所需等级</label>
+            <input v-model.number="form.userLevelRequired" type="number" min="1" class="input-dark" />
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">库存</label>
+            <input v-model.number="form.stock" type="number" min="0" class="input-dark" placeholder="留空不限" />
+          </div>
+          <div v-if="editingId">
+            <label class="block text-sm text-gray-400 mb-1">状态</label>
+            <select v-model="form.status" class="input-dark">
+              <option value="ACTIVE">上架</option>
+              <option value="INACTIVE">下架</option>
+            </select>
+          </div>
+        </div>
+      </form>
+      <template #footer>
+        <BaseButton variant="ghost" @click="dialogVisible = false">取消</BaseButton>
+        <BaseButton variant="primary" :loading="saving" @click="handleSave">{{ editingId ? '更新' : '创建' }}</BaseButton>
+      </template>
+    </BaseDialog>
+  </AdminLayout>
 </template>
 
 <script setup lang="ts">
-import { nextTick, onMounted, reactive, ref } from 'vue'
-import { ElMessage, ElMessageBox, type FormInstance, type FormRules } from 'element-plus'
-import zhCn from 'element-plus/es/locale/lang/zh-cn'
-import { createVipPackage, deleteVipPackage, getVipPackages, updateVipPackage, type VipPackageItem } from '../../api/vipPackages'
+import { ref, reactive, onMounted } from 'vue'
+import { getVipPackages, createVipPackage, updateVipPackage, deleteVipPackage } from '../../api/vipPackages'
+import { useToast } from '../../composables/useToast'
+import { useGlobalConfirm } from '../../composables/useConfirm'
+import AdminLayout from '../../components/AdminLayout.vue'
+import BaseTable from '../../components/BaseTable.vue'
+import BaseButton from '../../components/BaseButton.vue'
+import BaseDialog from '../../components/BaseDialog.vue'
+import StatusTag from '../../components/StatusTag.vue'
 
-interface PackageForm {
-  packageName: string
-  benefits: string
-  usageLimit: string
-  validPeriod: string
-  userLevelRequired: number
-  stock: number
-  status: string
-}
+const toast = useToast()
+const confirm = useGlobalConfirm()
 
-const packages = ref<VipPackageItem[]>([])
-const loading = ref(false)
-const submitting = ref(false)
+const packages = ref<any[]>([])
+const loading = ref(true)
 const dialogVisible = ref(false)
-const editingPackage = ref<VipPackageItem | null>(null)
-const formRef = ref<FormInstance>()
+const editingId = ref<number | null>(null)
+const saving = ref(false)
+const form = reactive({ packageName: '', benefits: '', usageLimit: '', validPeriod: '', userLevelRequired: 1, stock: 0, status: 'ACTIVE' })
 
-const form = reactive<PackageForm>({
-  packageName: '',
-  benefits: '',
-  usageLimit: '',
-  validPeriod: '',
-  userLevelRequired: 1,
-  stock: 0,
-  status: 'ACTIVE'
-})
+const columns = [
+  { key: 'packageName', label: '套餐名称' },
+  { key: 'benefits', label: '权益描述' },
+  { key: 'userLevelRequired', label: '所需等级' },
+  { key: 'status', label: '状态' },
+  { key: 'actions', label: '操作' }
+]
 
-const rules: FormRules<PackageForm> = {
-  packageName: [{ required: true, message: '请输入套餐名称', trigger: 'blur' }],
-  userLevelRequired: [{ required: true, message: '请输入所需等级', trigger: 'change' }],
-  stock: [{ required: true, message: '请输入库存', trigger: 'change' }]
-}
-
-function displayStatus(pkg: VipPackageItem) {
-  const status = pkg.status || ''
-  if (status === 'ACTIVE') return '生效中'
-  if (status === 'INACTIVE') return '已下架'
-  return status
-}
-
-function statusTagType(pkg: VipPackageItem) {
-  const status = pkg.status || ''
-  if (status === 'ACTIVE') return 'success'
-  return 'info'
-}
-
-async function fetchPackages() {
+async function load() {
   loading.value = true
-  try {
-    const response = await getVipPackages()
-    packages.value = response.data.data || []
-  } catch {
-    packages.value = []
-    ElMessage.error('套餐列表加载失败')
-  } finally {
-    loading.value = false
-  }
+  try { packages.value = (await getVipPackages()).data.data || [] }
+  catch { toast.error('套餐列表加载失败') }
+  finally { loading.value = false }
 }
 
-function openCreateDialog() {
-  editingPackage.value = null
-  resetForm()
+function openDialog(row?: any) {
+  editingId.value = row ? row.id : null
+  form.packageName = row ? (row.packageName || '') : ''
+  form.benefits = row ? (row.benefits || '') : ''
+  form.usageLimit = row ? (row.usageLimit || '') : ''
+  form.validPeriod = row ? (row.validPeriod || '') : ''
+  form.userLevelRequired = row ? (row.userLevelRequired || 1) : 1
+  form.stock = row ? (row.stock ?? 0) : 0
+  form.status = row ? (row.status || 'ACTIVE') : 'ACTIVE'
   dialogVisible.value = true
 }
 
-function openEditDialog(pkg: VipPackageItem) {
-  editingPackage.value = pkg
-  form.packageName = pkg.packageName || ''
-  form.benefits = pkg.benefits || ''
-  form.usageLimit = pkg.usageLimit || ''
-  form.validPeriod = pkg.validPeriod || ''
-  form.userLevelRequired = Number(pkg.userLevelRequired || 1)
-  form.stock = Number(pkg.stock || 0)
-  form.status = pkg.status || 'ACTIVE'
-  dialogVisible.value = true
-  nextTick(() => formRef.value?.clearValidate())
-}
-
-function resetForm() {
-  form.packageName = ''
-  form.benefits = ''
-  form.usageLimit = ''
-  form.validPeriod = ''
-  form.userLevelRequired = 1
-  form.stock = 0
-  form.status = 'ACTIVE'
-  nextTick(() => formRef.value?.clearValidate())
-}
-
-async function submitForm() {
-  if (!formRef.value) return
-
-  const valid = await formRef.value.validate().catch(() => false)
-  if (!valid) return
-
-  submitting.value = true
+async function handleSave() {
+  saving.value = true
   try {
-    const payload: { packageName: string; benefits?: string; usageLimit?: string; validPeriod?: string; userLevelRequired?: number; stock?: number; status?: string } = {
-      packageName: form.packageName.trim(),
-      benefits: form.benefits.trim(),
-      usageLimit: form.usageLimit.trim(),
-      validPeriod: form.validPeriod.trim(),
-      userLevelRequired: form.userLevelRequired,
-      stock: form.stock
-    }
-
-    if (editingPackage.value) {
-      payload.status = form.status
-      await updateVipPackage(editingPackage.value.id, payload)
-      ElMessage.success('套餐更新成功')
-    } else {
-      await createVipPackage(payload)
-      ElMessage.success('套餐创建成功')
-    }
+    const data: any = { packageName: form.packageName, benefits: form.benefits, usageLimit: form.usageLimit, validPeriod: form.validPeriod, userLevelRequired: form.userLevelRequired, stock: form.stock, status: form.status }
+    if (editingId.value) { await updateVipPackage(editingId.value, data); toast.success('套餐更新成功') }
+    else { await createVipPackage(data); toast.success('套餐创建成功') }
     dialogVisible.value = false
-    await fetchPackages()
-  } catch {
-    ElMessage.error(editingPackage.value ? '套餐更新失败' : '套餐创建失败')
-  } finally {
-    submitting.value = false
-  }
+    await load()
+  } catch { toast.error('保存失败') }
+  finally { saving.value = false }
 }
 
-async function confirmDelete(pkg: VipPackageItem) {
-  try {
-    await ElMessageBox.confirm(`确认删除套餐“${pkg.packageName}”？`, '删除套餐', {
-      confirmButtonText: '删除',
-      cancelButtonText: '取消',
-      type: 'warning'
-    })
-    await deleteVipPackage(pkg.id)
-    ElMessage.success('套餐已删除')
-    await fetchPackages()
-  } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error('删除失败')
-    }
-  }
+async function handleDelete(id: number) {
+  const ok = await confirm.open('确定删除该套餐吗？', '删除确认')
+  if (!ok) return
+  try { await deleteVipPackage(id); toast.success('套餐已删除'); await load() }
+  catch { toast.error('删除失败') }
 }
 
-onMounted(fetchPackages)
+onMounted(load)
 </script>
-
-<style scoped>
-.manage-page {
-  min-height: 100vh;
-  padding: 32px clamp(18px, 4vw, 56px);
-  color: #1f2937;
-  background: #f5f7fb;
-}
-
-.toolbar {
-  display: flex;
-  gap: 24px;
-  align-items: center;
-  justify-content: space-between;
-  max-width: 1180px;
-  margin: 0 auto 22px;
-}
-
-.eyebrow {
-  margin: 0 0 6px;
-  color: #e94560;
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.18em;
-}
-
-h1 {
-  margin: 0;
-  color: #111827;
-  font-size: 32px;
-}
-
-.table-card {
-  max-width: 1180px;
-  margin: 0 auto;
-  border: 0;
-  border-radius: 18px;
-}
-
-.show-table {
-  width: 100%;
-}
-
-.show-form {
-  padding-top: 8px;
-}
-
-.full-input {
-  width: 100%;
-}
-
-@media (max-width: 720px) {
-  .toolbar {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-}
-</style>

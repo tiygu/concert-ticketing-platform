@@ -1,460 +1,189 @@
 <template>
-  <el-config-provider :locale="zhCn">
-    <main class="manage-page">
-      <section class="toolbar">
-        <div>
-          <p class="eyebrow">ADMIN CONSOLE</p>
-          <h1>演出管理</h1>
-        </div>
-        <el-button type="primary" size="large" @click="openCreateDialog">新增演出</el-button>
-      </section>
+  <AdminLayout title="演出管理">
+    <div class="mb-4 flex justify-between">
+      <input v-model="keyword" class="input-dark max-w-sm" placeholder="搜索演出名称" @keyup.enter="search" />
+      <BaseButton variant="primary" @click="openDialog()">新增演出</BaseButton>
+    </div>
 
-      <el-card class="table-card" shadow="never">
-        <el-table v-loading="loading" :data="shows" row-key="id" class="show-table">
-          <el-table-column label="封面" width="96">
-            <template #default="{ row }">
-              <el-image v-if="resolveCoverImage(row.coverImage)" class="cover-thumb" :src="resolveCoverImage(row.coverImage)" fit="cover">
-                <template #error>
-                  <div class="cover-thumb placeholder"></div>
-                </template>
-              </el-image>
-              <div v-else class="cover-thumb placeholder"></div>
-            </template>
-          </el-table-column>
-          <el-table-column label="演出名称" min-width="180" prop="showName" show-overflow-tooltip>
-            <template #default="{ row }">{{ row.showName || row.title }}</template>
-          </el-table-column>
-          <el-table-column label="场馆" min-width="160" prop="venue" show-overflow-tooltip />
-          <el-table-column label="时间" min-width="180">
-            <template #default="{ row }">{{ formatDate(row.showTime) }}</template>
-          </el-table-column>
-          <el-table-column label="状态" width="120">
-            <template #default="{ row }">
-              <el-tag :type="statusTagType(row)" effect="light" round>{{ displayStatus(row) }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column label="操作" width="160" fixed="right">
-            <template #default="{ row }">
-              <el-button type="primary" link @click="openEditDialog(row)">编辑</el-button>
-              <el-button type="danger" link @click="confirmDelete(row)">删除</el-button>
-            </template>
-          </el-table-column>
-        </el-table>
-
-        <div class="pagination-wrap">
-          <el-pagination
-            v-model:current-page="page"
-            :page-size="pageSize"
-            :total="total"
-            background
-            layout="total, prev, pager, next"
-            @current-change="fetchShows"
-          />
-        </div>
-      </el-card>
-
-      <el-dialog v-model="dialogVisible" :title="editingShow ? '编辑演出' : '新增演出'" width="600px" @closed="resetForm">
-        <el-form ref="formRef" :model="form" :rules="rules" label-width="96px" class="show-form">
-          <el-form-item label="演出标题" prop="title">
-            <el-input v-model="form.title" placeholder="请输入演出标题" />
-          </el-form-item>
-          <el-form-item label="场馆" prop="venue">
-            <el-input v-model="form.venue" placeholder="请输入场馆" />
-          </el-form-item>
-          <el-form-item label="演出时间" prop="showTime">
-            <el-date-picker
-              v-model="form.showTime"
-              type="datetime"
-              placeholder="选择演出时间"
-              format="YYYY-MM-DD HH:mm"
-              value-format="YYYY-MM-DDTHH:mm:ss"
-              class="full-input"
-            />
-          </el-form-item>
-          <el-form-item label="票价" prop="ticketPrice">
-            <el-input-number v-model="form.ticketPrice" :precision="2" :min="0" class="full-input" />
-          </el-form-item>
-          <el-form-item label="座位总数" prop="totalSeats">
-            <el-input-number v-model="form.totalSeats" :min="1" :precision="0" class="full-input" />
-          </el-form-item>
-          <el-form-item label="描述" prop="description">
-            <el-input v-model="form.description" type="textarea" :rows="4" placeholder="请输入演出描述" />
-          </el-form-item>
-          <el-form-item label="封面图">
-            <el-upload
-              v-model:file-list="uploadFiles"
-              list-type="picture-card"
-              :limit="1"
-              accept=".jpg,.jpeg,.png"
-              :auto-upload="false"
-              :before-upload="beforeCoverUpload"
-              :on-change="handleCoverChange"
-              :on-exceed="handleUploadExceed"
-            >
-              <span class="upload-plus">+</span>
-              <template #tip>
-                <div class="upload-tip">支持 JPG/PNG，大小不超过 2MB</div>
-              </template>
-            </el-upload>
-          </el-form-item>
-        </el-form>
-
-        <template #footer>
-          <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" :loading="submitting" @click="submitForm">保存</el-button>
+    <div class="glass-card rounded-2xl overflow-hidden">
+      <BaseTable :columns="columns" :data="shows" :loading="loading">
+        <template #cell-coverImage="{ value }">
+          <img v-if="resolveCover(value as string)" :src="resolveCover(value as string)" class="w-12 h-8 object-cover rounded" />
+          <span v-else class="text-xs text-gray-500">无</span>
         </template>
-      </el-dialog>
-    </main>
-  </el-config-provider>
+        <template #cell-status="{ value }">
+          <StatusTag :type="statusTag(value as string)" :label="statusText(value as string)" />
+        </template>
+        <template #cell-actions="{ row }">
+          <div class="flex gap-2">
+            <button class="text-cyan-400 hover:underline text-sm" @click="openDialog(row as any)">编辑</button>
+            <button class="text-red-400 hover:underline text-sm" @click="handleDelete((row as any).id)">删除</button>
+          </div>
+        </template>
+      </BaseTable>
+      <div class="p-4">
+        <BasePagination :current="page" :page-size="pageSize" :total="total" @change="goPage" />
+      </div>
+    </div>
+
+    <BaseDialog v-model="dialogVisible" :title="editingId ? '编辑演出' : '新增演出'" width="600px">
+      <form @submit.prevent="handleSave" class="space-y-4">
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">演出名称</label>
+          <input v-model="form.showName" class="input-dark" placeholder="请输入演出名称" />
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">场馆</label>
+            <input v-model="form.venue" class="input-dark" placeholder="请输入场馆" />
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">演出时间</label>
+            <input v-model="form.showTime" type="datetime-local" class="input-dark" />
+          </div>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">票价范围</label>
+            <input v-model="form.priceRange" class="input-dark" placeholder="如 280-1680" />
+          </div>
+          <div>
+            <label class="block text-sm text-gray-400 mb-1">座位总数</label>
+            <input v-model="form.totalSeats" type="number" class="input-dark" placeholder="0" />
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">描述</label>
+          <textarea v-model="form.description" class="input-dark resize-none" rows="3" placeholder="演出简介..." />
+        </div>
+        <div>
+          <label class="block text-sm text-gray-400 mb-1">封面图片</label>
+          <input type="file" accept="image/*" @change="handleFile" class="text-sm text-gray-400" />
+        </div>
+      </form>
+      <template #footer>
+        <BaseButton variant="ghost" @click="dialogVisible = false">取消</BaseButton>
+        <BaseButton variant="primary" :loading="saving" @click="handleSave">{{ editingId ? '更新' : '创建' }}</BaseButton>
+      </template>
+    </BaseDialog>
+  </AdminLayout>
 </template>
 
 <script setup lang="ts">
-import { nextTick, onMounted, reactive, ref } from 'vue'
-import { ElMessage, ElMessageBox, type FormInstance, type FormRules, type UploadProps, type UploadRawFile, type UploadUserFile } from 'element-plus'
-import zhCn from 'element-plus/es/locale/lang/zh-cn'
-import { createShow, deleteShow, getShows, updateShow, type ShowItem } from '../../api/shows'
+import { ref, reactive, onMounted } from 'vue'
+import { getShows, createShow, updateShow, deleteShow, type ShowItem } from '../../api/shows'
+import { useToast } from '../../composables/useToast'
+import { useGlobalConfirm } from '../../composables/useConfirm'
+import AdminLayout from '../../components/AdminLayout.vue'
+import BaseTable from '../../components/BaseTable.vue'
+import BasePagination from '../../components/BasePagination.vue'
+import BaseButton from '../../components/BaseButton.vue'
+import BaseDialog from '../../components/BaseDialog.vue'
+import StatusTag from '../../components/StatusTag.vue'
 
-interface ShowForm {
-  title: string
-  venue: string
-  showTime: string
-  ticketPrice: number
-  totalSeats: number
-  description: string
-}
-
+const toast = useToast()
+const confirm = useGlobalConfirm()
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
 
 const shows = ref<ShowItem[]>([])
-const loading = ref(false)
-const submitting = ref(false)
-const dialogVisible = ref(false)
-const editingShow = ref<ShowItem | null>(null)
+const loading = ref(true)
+const keyword = ref('')
 const page = ref(1)
 const pageSize = ref(10)
 const total = ref(0)
-const formRef = ref<FormInstance>()
-const uploadFiles = ref<UploadUserFile[]>([])
+const dialogVisible = ref(false)
+const editingId = ref<number | null>(null)
+const saving = ref(false)
+const fileInput = ref<File | null>(null)
+const form = reactive({ showName: '', venue: '', showTime: '', priceRange: '', totalSeats: 0, description: '' })
 
-const form = reactive<ShowForm>({
-  title: '',
-  venue: '',
-  showTime: '',
-  ticketPrice: 0,
-  totalSeats: 1,
-  description: ''
-})
+const columns = [
+  { key: 'coverImage', label: '封面' },
+  { key: 'showName', label: '演出名称' },
+  { key: 'venue', label: '场馆' },
+  { key: 'showTime', label: '时间' },
+  { key: 'status', label: '状态' },
+  { key: 'actions', label: '操作' }
+]
 
-const rules: FormRules<ShowForm> = {
-  title: [{ required: true, message: '请输入演出标题', trigger: 'blur' }],
-  venue: [{ required: true, message: '请输入场馆', trigger: 'blur' }],
-  showTime: [{ required: true, message: '请选择演出时间', trigger: 'change' }],
-  ticketPrice: [{ required: true, message: '请输入票价', trigger: 'change' }],
-  totalSeats: [{ required: true, message: '请输入座位总数', trigger: 'change' }]
+function resolveCover(img: string | null) {
+  if (!img) return ''
+  if (/^(https?:)?\/\//.test(img) || img.startsWith('data:')) return img
+  if (img.startsWith('/uploads/')) return `${apiBaseUrl}${img}`
+  return img
 }
 
-function resolveCoverImage(coverImage: string | null) {
-  if (!coverImage) {
-    return ''
-  }
-  if (/^(https?:)?\/\//.test(coverImage) || coverImage.startsWith('data:')) {
-    return coverImage
-  }
-  if (coverImage.startsWith('/uploads/')) {
-    return `${apiBaseUrl}${coverImage}`
-  }
-  return coverImage
+function statusText(s: string) {
+  const st = (s || '').toUpperCase()
+  if (st.includes('ON_SALE')) return '售票中'
+  if (st.includes('UPCOMING')) return '即将开售'
+  if (st.includes('ENDED')) return '已结束'
+  return s || '未知'
+}
+function statusTag(s: string) {
+  const st = statusText(s)
+  if (st === '售票中') return 'success' as const
+  if (st === '即将开售') return 'warning' as const
+  return 'info' as const
 }
 
-function displayStatus(show: ShowItem) {
-  const status = show.statusText || show.status || ''
-  const upperStatus = status.toUpperCase()
-
-  if (status.includes('售票') || upperStatus.includes('ON_SALE') || upperStatus.includes('SELLING')) {
-    return '售票中'
-  }
-  if (status.includes('即将') || status.includes('开售') || upperStatus.includes('UPCOMING')) {
-    return '即将开售'
-  }
-  if (status.includes('结束') || upperStatus.includes('ENDED') || upperStatus.includes('FINISHED')) {
-    return '已结束'
-  }
-  return status || '未知状态'
-}
-
-function statusTagType(show: ShowItem) {
-  const status = displayStatus(show)
-  if (status === '售票中') {
-    return 'success'
-  }
-  if (status === '即将开售') {
-    return 'warning'
-  }
-  return 'info'
-}
-
-function formatDate(value: string) {
-  if (!value) {
-    return '时间待定'
-  }
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return value
-  }
-  return date.toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
-  })
-}
-
-function normalizeDateTime(value: string) {
-  if (!value) {
-    return ''
-  }
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return value
-  }
-  const pad = (number: number) => String(number).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`
-}
-
-async function fetchShows() {
+async function load() {
   loading.value = true
   try {
-    const response = await getShows({ page: page.value, pageSize: pageSize.value })
-    const result = response.data.data
-    shows.value = result.records || []
-    total.value = result.total || 0
-    page.value = result.page || page.value
-    pageSize.value = result.pageSize || pageSize.value
-  } catch {
-    shows.value = []
-    total.value = 0
-    ElMessage.error('演出列表加载失败')
-  } finally {
-    loading.value = false
-  }
+    const res = await getShows({ page: page.value, pageSize: pageSize.value, keyword: keyword.value || undefined as any })
+    const d = res.data.data as any
+    shows.value = d.records || []
+    total.value = d.total || 0
+  } catch { toast.error('演出列表加载失败') }
+  finally { loading.value = false }
 }
 
-function openCreateDialog() {
-  editingShow.value = null
-  resetForm()
+function openDialog(row?: ShowItem) {
+  editingId.value = row ? row.id : null
+  form.showName = row ? (row.showName || '') : ''
+  form.venue = row ? (row.venue || '') : ''
+  form.showTime = row ? (row.showTime || '').slice(0, 16) : ''
+  form.priceRange = row ? (row.priceRange || '') : ''
+  form.totalSeats = row ? row.totalSeats : 0
+  form.description = row ? (row.description || '') : ''
   dialogVisible.value = true
 }
 
-function openEditDialog(show: ShowItem) {
-  editingShow.value = show
-  form.title = show.title || show.showName || ''
-  form.venue = show.venue || ''
-  form.showTime = normalizeDateTime(show.showTime)
-  form.ticketPrice = Number(show.ticketPrice || 0)
-  form.totalSeats = Number(show.totalSeats || 1)
-  form.description = show.description || ''
-  uploadFiles.value = []
-  dialogVisible.value = true
-  nextTick(() => formRef.value?.clearValidate())
-}
+function handleFile(e: Event) { fileInput.value = (e.target as HTMLInputElement).files?.[0] || null }
 
-function resetForm() {
-  form.title = ''
-  form.venue = ''
-  form.showTime = ''
-  form.ticketPrice = 0
-  form.totalSeats = 1
-  form.description = ''
-  uploadFiles.value = []
-  nextTick(() => formRef.value?.clearValidate())
-}
-
-function validateCoverFile(rawFile: UploadRawFile) {
-  const isImage = ['image/jpeg', 'image/png'].includes(rawFile.type)
-  const isLt2M = rawFile.size / 1024 / 1024 < 2
-
-  if (!isImage) {
-    ElMessage.error('封面图仅支持 JPG/PNG 格式')
-    return false
-  }
-  if (!isLt2M) {
-    ElMessage.error('封面图大小不能超过 2MB')
-    return false
-  }
-  return true
-}
-
-const beforeCoverUpload: UploadProps['beforeUpload'] = validateCoverFile
-
-const handleCoverChange: UploadProps['onChange'] = (uploadFile) => {
-  if (uploadFile.raw && !validateCoverFile(uploadFile.raw)) {
-    uploadFiles.value = uploadFiles.value.filter((file) => file.uid !== uploadFile.uid)
-  }
-}
-
-function handleUploadExceed() {
-  ElMessage.warning('只能上传一张封面图')
-}
-
-function buildFormData() {
-  const formData = new FormData()
-  formData.append('title', form.title.trim())
-  formData.append('venue', form.venue.trim())
-  formData.append('showTime', form.showTime)
-  formData.append('ticketPrice', String(form.ticketPrice))
-  formData.append('totalSeats', String(form.totalSeats))
-  formData.append('description', form.description || '')
-
-  const cover = uploadFiles.value[0]?.raw
-  if (cover) {
-    formData.append('cover', cover)
-  }
-  return formData
-}
-
-async function submitForm() {
-  if (!formRef.value) {
-    return
-  }
-
-  const valid = await formRef.value.validate().catch(() => false)
-  if (!valid) {
-    return
-  }
-
-  submitting.value = true
+async function handleSave() {
+  saving.value = true
   try {
-    const formData = buildFormData()
-    if (editingShow.value) {
-      await updateShow(editingShow.value.id, formData)
-      ElMessage.success('演出更新成功')
+    const fd = new FormData()
+    fd.append('showName', form.showName)
+    fd.append('venue', form.venue)
+    fd.append('showTime', form.showTime)
+    fd.append('priceRange', form.priceRange)
+    fd.append('totalSeats', String(form.totalSeats))
+    fd.append('description', form.description)
+    if (fileInput.value) fd.append('coverImage', fileInput.value)
+    if (editingId.value) {
+      await updateShow(editingId.value, fd)
+      toast.success('演出更新成功')
     } else {
-      await createShow(formData)
-      ElMessage.success('演出创建成功')
+      await createShow(fd)
+      toast.success('演出创建成功')
     }
     dialogVisible.value = false
-    await fetchShows()
-  } catch {
-    ElMessage.error(editingShow.value ? '演出更新失败' : '演出创建失败')
-  } finally {
-    submitting.value = false
-  }
+    await load()
+  } catch { toast.error('保存失败') }
+  finally { saving.value = false }
 }
 
-async function confirmDelete(show: ShowItem) {
-  try {
-    await ElMessageBox.confirm(`确认删除“${show.showName || show.title}”？`, '删除演出', {
-      confirmButtonText: '删除',
-      cancelButtonText: '取消',
-      type: 'warning'
-    })
-    await deleteShow(show.id)
-    ElMessage.success('演出已删除')
-    if (shows.value.length === 1 && page.value > 1) {
-      page.value -= 1
-    }
-    await fetchShows()
-  } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error('删除失败')
-    }
-  }
+async function handleDelete(id: number) {
+  const ok = await confirm.open('确定删除该演出吗？', '删除确认')
+  if (!ok) return
+  try { await deleteShow(id); toast.success('演出已删除'); await load() }
+  catch { toast.error('删除失败') }
 }
 
-onMounted(fetchShows)
+function search() { page.value = 1; load() }
+function goPage(p: number) { page.value = p; load() }
+
+onMounted(load)
 </script>
-
-<style scoped>
-.manage-page {
-  min-height: 100vh;
-  padding: 32px clamp(18px, 4vw, 56px);
-  color: #1f2937;
-  background: #f5f7fb;
-}
-
-.toolbar {
-  display: flex;
-  gap: 24px;
-  align-items: center;
-  justify-content: space-between;
-  max-width: 1180px;
-  margin: 0 auto 22px;
-}
-
-.eyebrow {
-  margin: 0 0 6px;
-  color: #e94560;
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.18em;
-}
-
-h1 {
-  margin: 0;
-  color: #111827;
-  font-size: 32px;
-}
-
-.table-card {
-  max-width: 1180px;
-  margin: 0 auto;
-  border: 0;
-  border-radius: 18px;
-}
-
-.show-table {
-  width: 100%;
-}
-
-.cover-thumb {
-  width: 60px;
-  height: 40px;
-  overflow: hidden;
-  border-radius: 8px;
-  vertical-align: middle;
-}
-
-.cover-thumb.placeholder {
-  background:
-    linear-gradient(135deg, rgba(233, 69, 96, 0.86), rgba(22, 33, 62, 0.9)),
-    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.18) 0 1px, transparent 1px 8px);
-}
-
-.pagination-wrap {
-  display: flex;
-  justify-content: flex-end;
-  margin-top: 22px;
-}
-
-.show-form {
-  padding-top: 8px;
-}
-
-.full-input {
-  width: 100%;
-}
-
-.upload-plus {
-  color: #909399;
-  font-size: 28px;
-  line-height: 1;
-}
-
-.upload-tip {
-  color: #909399;
-  font-size: 12px;
-}
-
-@media (max-width: 720px) {
-  .toolbar {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .pagination-wrap {
-    justify-content: center;
-  }
-}
-</style>

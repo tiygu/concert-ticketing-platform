@@ -1,138 +1,113 @@
 <template>
-  <div class="login-container">
-    <el-card class="login-card">
-      <template #header>
-        <h2 class="login-title">用户登录</h2>
-      </template>
-      <el-form
-        ref="formRef"
-        :model="form"
-        :rules="rules"
-        label-width="0"
-        size="large"
-        @keyup.enter="handleLogin"
-      >
-        <el-form-item prop="username">
-          <el-input
-            v-model="form.username"
-            placeholder="请输入用户名"
-            prefix-icon="User"
-          />
-        </el-form-item>
-        <el-form-item prop="password">
-          <el-input
-            v-model="form.password"
-            type="password"
-            placeholder="请输入密码"
-            prefix-icon="Lock"
-            show-password
-          />
-        </el-form-item>
-        <el-form-item>
-          <el-button
-            type="primary"
-            class="login-btn"
-            :loading="loading"
-            @click="handleLogin"
-          >
+  <div class="min-h-screen flex items-center justify-center bg-[linear-gradient(135deg,#0a0a0f_0%,#1a0a2e_50%,#0f0f23_100%)]">
+    <!-- Particle background -->
+    <canvas ref="particleCanvas" class="fixed inset-0 pointer-events-none z-0" />
+
+    <div class="relative z-10 w-full max-w-md mx-4">
+      <div class="glass-card rounded-2xl p-8 animate-[fadeIn_0.5s_ease]">
+        <div class="text-center mb-8">
+          <div class="w-16 h-16 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center mx-auto mb-4">
+            <span class="text-white text-2xl font-bold">T</span>
+          </div>
+          <h1 class="font-orbitron text-2xl font-bold neon-glow">STAR TICKET</h1>
+          <p class="text-gray-400 text-sm mt-2">大型演唱会票务预订与VIP服务平台</p>
+        </div>
+
+        <form @submit.prevent="handleLogin" class="space-y-5">
+          <div>
+            <label class="block text-sm text-gray-400 mb-2">用户名</label>
+            <input
+              v-model="form.username"
+              class="input-dark"
+              placeholder="请输入用户名"
+              @blur="errors.username = validateField('username')"
+            />
+            <p v-if="errors.username" class="text-red-400 text-xs mt-1">{{ errors.username }}</p>
+          </div>
+
+          <div>
+            <label class="block text-sm text-gray-400 mb-2">密码</label>
+            <input
+              v-model="form.password"
+              type="password"
+              class="input-dark"
+              placeholder="请输入密码"
+              @blur="errors.password = validateField('password')"
+            />
+            <p v-if="errors.password" class="text-red-400 text-xs mt-1">{{ errors.password }}</p>
+          </div>
+
+          <BaseButton variant="primary" size="lg" native-type="submit" :loading="loading" class="w-full">
             登 录
-          </el-button>
-        </el-form-item>
-      </el-form>
-      <div class="login-footer">
-        还没有账号？<router-link to="/register">立即注册</router-link>
+          </BaseButton>
+        </form>
+
+        <p class="text-center text-sm text-gray-400 mt-6">
+          还没有账号？<router-link to="/register" class="text-cyan-400 hover:underline">立即注册</router-link>
+        </p>
       </div>
-    </el-card>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { useAuthStore } from '../stores/auth'
+import { useToast } from '../composables/useToast'
+import { useParticles } from '../composables/useParticles'
+import BaseButton from '../components/BaseButton.vue'
 
 const router = useRouter()
 const route = useRoute()
 const authStore = useAuthStore()
-const formRef = ref<FormInstance>()
+const toast = useToast()
+
+const particleCanvas = ref<HTMLCanvasElement>()
+const { init } = useParticles(40)
+
 const loading = ref(false)
+const form = reactive({ username: '', password: '' })
+const errors = reactive({ username: '', password: '' })
 
-const form = reactive({
-  username: '',
-  password: ''
-})
-
-const rules: FormRules = {
-  username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
+const rules = {
+  username: [{ required: true, message: '请输入用户名' }],
   password: [
-    { required: true, message: '请输入密码', trigger: 'blur' },
-    { min: 6, message: '密码长度不能少于6位', trigger: 'blur' }
+    { required: true, message: '请输入密码' },
+    { minLen: 6, message: '密码长度不能少于6位' }
   ]
 }
 
-async function handleLogin() {
-  if (!formRef.value) return
-  const valid = await formRef.value.validate().catch(() => false)
-  if (!valid) return
+function validateField(field: string): string {
+  const val = (form as Record<string, string>)[field]
+  const fieldRules = (rules as Record<string, { required?: boolean; minLen?: number; message?: string }[]>)[field]
+  for (const r of fieldRules) {
+    if (r.required && !val.trim()) return r.message || '此字段不能为空'
+    if (r.minLen && val.length < r.minLen) return r.message || ''
+  }
+  return ''
+}
 
+function validate(): boolean {
+  errors.username = validateField('username')
+  errors.password = validateField('password')
+  return !errors.username && !errors.password
+}
+
+async function handleLogin() {
+  if (!validate()) return
   loading.value = true
   const success = await authStore.login(form.username, form.password)
   loading.value = false
-
   if (success) {
-    ElMessage.success('登录成功')
-    const redirect = (route.query.redirect as string) || '/'
-    router.push(redirect)
+    toast.success('登录成功')
+    router.push((route.query.redirect as string) || '/')
   } else {
-    ElMessage.error('用户名或密码错误')
+    toast.error('用户名或密码错误')
   }
 }
+
+onMounted(() => {
+  if (particleCanvas.value) init(particleCanvas.value)
+})
 </script>
-
-<style scoped>
-.login-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-}
-
-.login-card {
-  width: 400px;
-  border-radius: 8px;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
-}
-
-.login-card :deep(.el-card__header) {
-  text-align: center;
-  border-bottom: none;
-  padding-bottom: 0;
-}
-
-.login-title {
-  margin: 0;
-  font-size: 24px;
-  color: #303133;
-}
-
-.login-btn {
-  width: 100%;
-}
-
-.login-footer {
-  text-align: center;
-  font-size: 14px;
-  color: #909399;
-}
-
-.login-footer a {
-  color: #667eea;
-  text-decoration: none;
-}
-
-.login-footer a:hover {
-  text-decoration: underline;
-}
-</style>

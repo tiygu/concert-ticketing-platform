@@ -1,5 +1,4 @@
 import axios from 'axios'
-import { ElMessage } from 'element-plus'
 
 const request = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080',
@@ -93,6 +92,15 @@ request.interceptors.response.use(
           localStorage.setItem('refreshToken', newRefreshToken)
           localStorage.setItem('userInfo', JSON.stringify(userInfo))
 
+          // Sync Pinia auth store with renewed tokens
+          try {
+            const { useAuthStore } = await import('../stores/auth')
+            const authStore = useAuthStore()
+            authStore.accessToken = accessToken
+            authStore.refreshToken = newRefreshToken
+            authStore.userInfo = userInfo
+          } catch { /* store not available yet */ }
+
           isRefreshing = false
           resolvePendingRequests(accessToken)
 
@@ -107,16 +115,15 @@ request.interceptors.response.use(
         localStorage.removeItem('accessToken')
         localStorage.removeItem('refreshToken')
         localStorage.removeItem('userInfo')
-        ElMessage.error('登录已过期，请重新登录')
         window.location.href = '/login'
         return Promise.reject(refreshError)
       }
     }
 
     // Handle other errors
-    const msg = error.response?.data?.message || '请求失败'
     if (error.response?.status === 403) {
-      ElMessage.error(msg)
+      const msg = error.response?.data?.message || '请求失败'
+      console.error('403 Forbidden:', msg)
     }
     return Promise.reject(error)
   }

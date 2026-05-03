@@ -1,9 +1,9 @@
 <template>
-  <router-view></router-view>
+  <router-view />
+  <ToastContainer />
+  <ConfirmDialog />
+  <PromptDialog />
 </template>
 
 <script setup lang="ts">
 </script>
-
-<style>
-</style>

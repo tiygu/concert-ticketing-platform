@@ -195,5 +195,5 @@ CREATE TABLE reviews (
 -- 初始化：插入默认管理员账号 (密码: admin123, BCrypt加密)
 -- ============================================================
 INSERT INTO users (username, password, role, vip_level, points, status)
-VALUES ('admin', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi',
+VALUES ('admin', '$2a$10$qTm2m5s/GTFlbpCOrpdP.OghGGn.aGGZFfTQr5qF3zhdQ3.fQEboC',
         'ADMIN', 0, 0, 'ACTIVE');

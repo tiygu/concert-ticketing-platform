@@ -1,4 +1,5 @@
 import request from '../utils/request'
+import type { ApiResult } from '@/types/api'
 import type { AxiosResponse } from 'axios'
 
 export interface ReviewItem {
@@ -17,12 +18,6 @@ export interface ReviewCreatePayload {
   showId: number
   rating: number  // 1-5
   content: string
-}
-
-export interface ApiResult<T> {
-  code: number
-  message?: string
-  data: T
 }
 
 export async function createReview(data: ReviewCreatePayload): Promise<AxiosResponse<ApiResult<ReviewItem>>> {

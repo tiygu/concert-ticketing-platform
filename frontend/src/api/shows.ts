@@ -1,4 +1,5 @@
 import request from '../utils/request'
+import type { ApiResult, PageResult } from '@/types/api'
 
 export interface ShowItem {
   id: number;
@@ -18,19 +19,6 @@ export interface ShowItem {
   isDeleted: number;
   createdAt: string;
   updatedAt: string;
-}
-
-export interface PageResult<T> {
-  records: T[];
-  total: number;
-  page: number;
-  pageSize: number;
-}
-
-export interface ApiResult<T> {
-  code: number;
-  message: string;
-  data: T;
 }
 
 export function getShows(params: { page: number; pageSize: number; keyword?: string }) {

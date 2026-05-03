@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import HomePage from '../views/HomePage.vue'
+import { useAuthStore } from '../stores/auth'
 
 const routes: Array<RouteRecordRaw> = [
   {
@@ -48,12 +49,6 @@ const routes: Array<RouteRecordRaw> = [
     path: '/admin/shows',
     name: 'ShowManage',
     component: () => import('../views/admin/ShowManage.vue'),
-    meta: { requiresAuth: true, requiresAdmin: true }
-  },
-  {
-    path: '/admin/orders',
-    name: 'OrderManage',
-    component: () => import('../views/admin/OrderManage.vue'),
     meta: { requiresAuth: true, requiresAdmin: true }
   },
   {
@@ -111,34 +106,21 @@ const router = createRouter({
   routes
 })
 
-// Navigation guard
+// Navigation guard — uses Pinia store for consistent auth state
 router.beforeEach((to, _from, next) => {
-  const accessToken = localStorage.getItem('accessToken')
-  const userInfoStr = localStorage.getItem('userInfo')
-  let isAdmin = false
+  const authStore = useAuthStore()
+  const { accessToken, isAdmin } = authStore
 
-  if (userInfoStr) {
-    try {
-      const userInfo = JSON.parse(userInfoStr)
-      isAdmin = userInfo.role === 'ADMIN'
-    } catch {
-      // ignore parse error
-    }
-  }
-
-  // If visiting guest-only routes (login/register) while logged in, redirect to home
   if (to.meta.guest && accessToken) {
     next('/')
     return
   }
 
-  // If route requires auth and user is not logged in
   if (to.meta.requiresAuth && !accessToken) {
     next({ path: '/login', query: { redirect: to.fullPath } })
     return
   }
 
-  // If route requires admin and user is not admin
   if (to.meta.requiresAdmin && !isAdmin) {
     next('/')
     return

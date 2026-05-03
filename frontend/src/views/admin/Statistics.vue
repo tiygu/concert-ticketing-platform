@@ -1,152 +1,95 @@
 <template>
-  <el-config-provider :locale="zhCn">
-    <main class="manage-page">
-      <section class="toolbar">
-        <div>
-          <p class="eyebrow">ADMIN CONSOLE</p>
-          <h1>数据统计</h1>
-        </div>
-      </section>
-
-      <div class="statistics-container">
-        <!-- Revenue Section -->
-        <el-card class="section-card" shadow="never">
-          <template #header>
-            <div class="card-header">
-              <span>营收统计</span>
-            </div>
-          </template>
-          <!-- Date range picker -->
-          <el-date-picker
-            v-model="dateRange"
-            type="daterange"
-            range-separator="至"
-            start-placeholder="开始日期"
-            end-placeholder="结束日期"
-            value-format="YYYY-MM-DD"
-            @change="loadRevenue"
-          />
-          
-          <!-- Summary cards -->
-          <el-row :gutter="20" style="margin-top: 20px">
-            <el-col :span="8">
-              <el-statistic title="总订单数" :value="revenue.totalOrders" />
-            </el-col>
-            <el-col :span="8">
-              <el-statistic title="售票总数" :value="revenue.totalTickets" />
-            </el-col>
-            <el-col :span="8">
-              <el-statistic title="总收入 (¥)" :value="(revenue.totalRevenue || 0).toFixed(2)" />
-            </el-col>
-          </el-row>
-          
-          <!-- Revenue bar chart -->
-          <div ref="revenueChartRef" style="width: 100%; height: 400px; margin-top: 20px"></div>
-        </el-card>
-        
-        <!-- Stock Section -->
-        <el-card class="section-card" shadow="never">
-          <template #header>
-            <div class="card-header">
-              <span>库存统计</span>
-            </div>
-          </template>
-          <!-- Show selector -->
-          <el-select v-model="selectedShowId" placeholder="选择演出" @change="loadStock" filterable>
-            <el-option v-for="s in shows" :key="s.id" :label="s.showName || s.title" :value="s.id" />
-          </el-select>
-          
-          <!-- Stock donut chart -->
-          <div ref="stockChartRef" style="width: 100%; height: 400px; margin-top: 20px"></div>
-          
-          <!-- Stock detail table -->
-          <el-table :data="stock.details" style="margin-top: 20px" border>
-            <el-table-column prop="ticketType" label="票种">
-              <template #default="{ row }">
-                <el-tag :type="row.ticketType === 'VIP' ? 'warning' : 'info'">{{ row.ticketType === 'VIP' ? 'VIP票' : '普通票' }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column prop="priceType" label="票价类型" />
-            <el-table-column prop="price" label="单价">
-              <template #default="{ row }">¥{{ row.price.toFixed(2) }}</template>
-            </el-table-column>
-            <el-table-column prop="total" label="总库存" />
-            <el-table-column prop="sold" label="已售" />
-            <el-table-column prop="stock" label="剩余" />
-            <el-table-column prop="soldPercentage" label="售出率(%)">
-              <template #default="{ row }">
-                <el-progress :percentage="Number((row.soldPercentage || 0).toFixed(1))" :color="customColors" />
-              </template>
-            </el-table-column>
-          </el-table>
-        </el-card>
+  <AdminLayout title="数据统计">
+    <!-- Revenue -->
+    <div class="glass-card rounded-2xl p-6 mb-6">
+      <h3 class="text-lg font-bold mb-4">营收统计</h3>
+      <div class="mb-4">
+        <input v-model="dateRange.start" type="date" class="input-dark w-auto inline-block mr-2" />
+        <span class="text-gray-400 mr-2">至</span>
+        <input v-model="dateRange.end" type="date" class="input-dark w-auto inline-block mr-4" />
+        <BaseButton variant="primary" size="sm" @click="loadRevenue">查询</BaseButton>
       </div>
-    </main>
-  </el-config-provider>
+      <div class="grid grid-cols-3 gap-4 mb-6">
+        <div class="stat-card rounded-xl p-4"><p class="text-gray-400 text-sm">总订单数</p><p class="text-3xl font-bold font-orbitron">{{ revenue.totalOrders }}</p></div>
+        <div class="stat-card rounded-xl p-4"><p class="text-gray-400 text-sm">售票总数</p><p class="text-3xl font-bold font-orbitron">{{ revenue.totalTickets }}</p></div>
+        <div class="stat-card rounded-xl p-4"><p class="text-gray-400 text-sm">总收入 (¥)</p><p class="text-3xl font-bold font-orbitron text-neon-cyan">{{ (revenue.totalRevenue || 0).toFixed(2) }}</p></div>
+      </div>
+      <div ref="revenueChartRef" style="width:100%;height:400px" />
+    </div>
+
+    <!-- Stock -->
+    <div class="glass-card rounded-2xl p-6">
+      <h3 class="text-lg font-bold mb-4">库存统计</h3>
+      <div class="mb-4">
+        <select v-model="selectedShowId" class="input-dark max-w-xs" @change="loadStock">
+          <option value="">选择演出</option>
+          <option v-for="s in shows" :key="s.id" :value="s.id">{{ s.showName || s.title }}</option>
+        </select>
+        <BaseButton variant="primary" size="sm" class="ml-3" @click="loadStock">查询</BaseButton>
+      </div>
+      <div ref="stockChartRef" style="width:100%;height:400px;margin-bottom:20px" />
+      <table class="w-full text-sm">
+        <thead class="bg-white/5 text-gray-400"><tr>
+          <th class="text-left p-3">票种</th><th class="text-left p-3">票价类型</th><th class="text-left p-3">单价</th><th class="text-left p-3">总库存</th><th class="text-left p-3">已售</th><th class="text-left p-3">剩余</th><th class="text-left p-3">售出率</th>
+        </tr></thead>
+        <tbody class="divide-y divide-white/5">
+          <tr v-for="d in stock.details" :key="d.ticketType + d.priceType">
+            <td class="p-3"><span :class="d.ticketType === 'VIP' ? 'tag-purple' : 'tag-info'" class="px-2 py-1 rounded text-xs">{{ d.ticketType === 'VIP' ? 'VIP票' : '普通票' }}</span></td>
+            <td class="p-3">{{ d.priceType }}</td><td class="p-3">¥{{ d.price?.toFixed?.(2) ?? d.price }}</td>
+            <td class="p-3">{{ d.total }}</td><td class="p-3">{{ d.sold }}</td><td class="p-3">{{ d.stock }}</td>
+            <td class="p-3">
+              <div class="flex items-center gap-2">
+                <div class="flex-1 h-2 bg-white/10 rounded-full overflow-hidden">
+                  <div class="h-full bg-gradient-to-r from-pink-500 to-purple-600 rounded-full" :style="{ width: (d.soldPercentage || 0) + '%' }" />
+                </div>
+                <span class="text-xs text-gray-400 w-12">{{ (d.soldPercentage || 0).toFixed(1) }}%</span>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </AdminLayout>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import * as echarts from 'echarts'
-import { ElMessage } from 'element-plus'
-import zhCn from 'element-plus/es/locale/lang/zh-cn'
-import { getRevenueReport, getStockStats, type RevenueReportResponse, type StockStatsResponse, type RevenueDetailItem } from '../../api/statistics'
+import { getRevenueReport, getStockStats, type RevenueReportResponse, type StockStatsResponse } from '../../api/statistics'
 import { getShows, type ShowItem } from '../../api/shows'
+import { useToast } from '../../composables/useToast'
+import AdminLayout from '../../components/AdminLayout.vue'
+import BaseButton from '../../components/BaseButton.vue'
 
-// Revenue
-const dateRange = ref<[string, string]>(['2026-01-01', '2026-12-31'])
-const revenue = ref<RevenueReportResponse>({ totalOrders: 0, totalTickets: 0, totalRevenue: 0, details: [] })
-const revenueChartRef = ref<HTMLDivElement>()
+const toast = useToast()
+
+const revenueChartRef = ref<HTMLElement>()
+const stockChartRef = ref<HTMLElement>()
 let revenueChart: echarts.ECharts | null = null
-
-// Stock
-const shows = ref<ShowItem[]>([])
-const selectedShowId = ref<number | null>(null)
-const stock = ref<StockStatsResponse>({ showId: 0, showName: '', totalStock: 0, totalSold: 0, totalCapacity: 0, soldPercentage: 0, details: [] })
-const stockChartRef = ref<HTMLDivElement>()
 let stockChart: echarts.ECharts | null = null
 
-const customColors = [
-  { color: '#f56c6c', percentage: 20 },
-  { color: '#e6a23c', percentage: 40 },
-  { color: '#5cb87a', percentage: 60 },
-  { color: '#1989fa', percentage: 80 },
-  { color: '#6f7ad3', percentage: 100 },
-]
+const shows = ref<ShowItem[]>([])
+const selectedShowId = ref('')
 
-async function loadShows() {
-  try {
-    const res = await getShows({ page: 1, pageSize: 100 })
-    shows.value = res.data?.data?.records || []
-  } catch { /* ignore */ }
-}
+const dateRange = reactive({ start: '2026-01-01', end: '2026-12-31' })
+const revenue = ref<RevenueReportResponse>({ totalOrders: 0, totalTickets: 0, totalRevenue: 0, details: [] })
+const stock = ref<StockStatsResponse | any>({ showId: 0, showName: '', details: [] })
 
 async function loadRevenue() {
-  const [startDate, endDate] = dateRange.value || ['', '']
   try {
-    const res = await getRevenueReport({ startDate, endDate })
-    const data = (res.data as { data?: RevenueReportResponse }).data || res.data
-    revenue.value = data as RevenueReportResponse || { totalOrders: 0, totalTickets: 0, totalRevenue: 0, details: [] }
-    await nextTick()
+    const res = await getRevenueReport({ startDate: dateRange.start, endDate: dateRange.end })
+    revenue.value = res.data.data
     renderRevenueChart()
-  } catch (e) {
-    const err = e as { response?: { data?: { message?: string } } }
-    ElMessage.error(err?.response?.data?.message || '加载营收数据失败')
-  }
+  } catch { toast.error('营收数据加载失败') }
 }
 
 async function loadStock() {
   if (!selectedShowId.value) return
   try {
-    const res = await getStockStats(selectedShowId.value)
-    const data = (res.data as { data?: StockStatsResponse }).data || res.data
-    stock.value = data as StockStatsResponse || { showId: 0, showName: '', totalStock: 0, totalSold: 0, totalCapacity: 0, soldPercentage: 0, details: [] }
-    await nextTick()
+    const res = await getStockStats(Number(selectedShowId.value))
+    stock.value = res.data.data
     renderStockChart()
-  } catch (e) {
-    const err = e as { response?: { data?: { message?: string } } }
-    ElMessage.error(err?.response?.data?.message || '加载库存数据失败')
-  }
+  } catch { toast.error('库存数据加载失败') }
 }
 
 function renderRevenueChart() {
@@ -154,21 +97,17 @@ function renderRevenueChart() {
   if (!revenueChart) {
     revenueChart = echarts.init(revenueChartRef.value)
   }
-  const names = revenue.value.details.map((d: RevenueDetailItem) => d.showName || `演出#${d.showId}`)
-  const revenues = revenue.value.details.map((d: RevenueDetailItem) => d.revenue)
-  const counts = revenue.value.details.map((d: RevenueDetailItem) => d.orderCount)
-  
+  const details = revenue.value.details || []
   revenueChart.setOption({
     tooltip: { trigger: 'axis' },
-    legend: { data: ['收入 (¥)', '订单数'] },
-    xAxis: { type: 'category', data: names, axisLabel: { rotate: 30 } },
-    yAxis: [
-      { type: 'value', name: '收入 (¥)' },
-      { type: 'value', name: '订单数' }
-    ],
+    legend: { textStyle: { color: '#fff' }, data: ['订单数', '售票数', '收入'] },
+    xAxis: { type: 'category', data: details.map(d => d.showName), axisLabel: { color: '#888' }, axisLine: { lineStyle: { color: '#333' } } },
+    yAxis: [{ type: 'value', name: '数量', nameTextStyle: { color: '#888' }, axisLabel: { color: '#888' }, splitLine: { lineStyle: { color: '#222' } } },
+      { type: 'value', name: '收入(¥)', nameTextStyle: { color: '#888' }, axisLabel: { color: '#888' }, splitLine: { show: false } }],
     series: [
-      { name: '收入 (¥)', type: 'bar', data: revenues, yAxisIndex: 0, itemStyle: { color: '#409EFF' } },
-      { name: '订单数', type: 'line', data: counts, yAxisIndex: 1, itemStyle: { color: '#67C23A' } }
+      { name: '订单数', type: 'bar', data: details.map(d => d.orderCount), itemStyle: { color: '#8338ec' } },
+      { name: '售票数', type: 'bar', data: details.map(d => d.ticketCount), itemStyle: { color: '#3a86ff' } },
+      { name: '收入', type: 'line', yAxisIndex: 1, data: details.map(d => d.revenue), itemStyle: { color: '#00f5ff' }, lineStyle: { color: '#00f5ff' } }
     ]
   })
 }
@@ -178,83 +117,20 @@ function renderStockChart() {
   if (!stockChart) {
     stockChart = echarts.init(stockChartRef.value)
   }
+  const details = stock.value.details || []
   stockChart.setOption({
-    title: { text: stock.value.showName, left: 'center' },
-    tooltip: { trigger: 'item' },
-    legend: { orient: 'vertical', left: 'left' },
+    tooltip: { trigger: 'item', formatter: '{b}: {c} ({d}%)' },
     series: [{
-      type: 'pie',
-      radius: ['40%', '70%'],
-      data: [
-        { name: '已售', value: stock.value.totalSold, itemStyle: { color: '#67C23A' } },
-        { name: '剩余', value: stock.value.totalStock, itemStyle: { color: '#E6A23C' } }
-      ]
+      type: 'pie', radius: ['40%', '70%'],
+      data: details.map((d: any) => ({ name: d.ticketType + '-' + d.priceType, value: d.sold })),
+      label: { color: '#fff' }
     }]
   })
 }
 
-function handleResize() {
-  revenueChart?.resize()
-  stockChart?.resize()
-}
-
-onMounted(() => {
-  loadShows()
-  loadRevenue()
-  window.addEventListener('resize', handleResize)
-})
-
-onUnmounted(() => {
-  window.removeEventListener('resize', handleResize)
-  revenueChart?.dispose()
-  stockChart?.dispose()
+onMounted(async () => {
+  try { shows.value = (await getShows({ page: 1, pageSize: 1000 })).data.data?.records || [] }
+  catch { /* ignore */ }
+  await loadRevenue()
 })
 </script>
-
-<style scoped>
-.manage-page {
-  min-height: 100vh;
-  padding: 32px clamp(18px, 4vw, 56px);
-  color: #1f2937;
-  background: #f5f7fb;
-}
-
-.toolbar {
-  display: flex;
-  gap: 24px;
-  align-items: center;
-  justify-content: space-between;
-  max-width: 1180px;
-  margin: 0 auto 22px;
-}
-
-.eyebrow {
-  margin: 0 0 6px;
-  color: #e94560;
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.18em;
-}
-
-h1 {
-  margin: 0;
-  color: #111827;
-  font-size: 32px;
-}
-
-.statistics-container {
-  max-width: 1180px;
-  margin: 0 auto;
-}
-
-.section-card {
-  margin-bottom: 24px;
-  border: 0;
-  border-radius: 18px;
-}
-
-.card-header {
-  font-weight: bold;
-  font-size: 16px;
-}
-</style>

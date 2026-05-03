@@ -1,4 +1,5 @@
 import request from '../utils/request'
+import type { ApiResult, PageResult } from '@/types/api'
 
 export interface SeatItem {
   id: number; showId: number; seatNumber: string; ticketType: string;
@@ -13,7 +14,6 @@ export interface OrderItem {
   expireTime: string | null; showName: string; createdAt: string; updatedAt: string;
 }
 
-export interface ApiResult<T> { code: number; message: string; data: T; }
 
 export function getShowSeats(showId: number) {
   return request.get<ApiResult<SeatItem[]>>(`/api/shows/${showId}/seats`)
@@ -43,14 +43,7 @@ export interface AdminOrderItem extends OrderItem {
   username: string;
 }
 
-export interface PageResult<T> {
-  list: T[];
-  total: number;
-  page: number;
-  size: number;
-}
-
-export function getAdminOrders(params: { page?: number; size?: number; status?: string }) {
+export function getAdminOrders(params: { page?: number; pageSize?: number; status?: string }) {
   return request.get<ApiResult<PageResult<AdminOrderItem>>>('/api/admin/orders', { params })
 }
 

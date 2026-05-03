@@ -1,4 +1,5 @@
 import request from '../utils/request'
+import type { ApiResult, PageResult } from '@/types/api'
 
 export interface UserManageItem {
   id: number; username: string; role: string; phone: string | null;
@@ -11,9 +12,6 @@ export interface UserProfile {
   email: string | null; vipLevel: number; points: number;
   status: string; createdAt: string;
 }
-
-export interface PageResult<T> { records: T[]; total: number; page: number; pageSize: number; }
-export interface ApiResult<T> { code: number; message: string; data: T; }
 
 export function getAdminUsers(params: { page: number; pageSize: number; keyword?: string }) {
   return request.get<ApiResult<PageResult<UserManageItem>>>('/api/admin/users', { params })

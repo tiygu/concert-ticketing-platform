@@ -1,569 +1,220 @@
 <template>
-  <el-config-provider :locale="zhCn">
-    <main v-loading="loading" class="detail-page" element-loading-background="rgba(26, 26, 46, 0.72)">
-      <el-result v-if="error" icon="error" title="演出不存在" sub-title="该演出可能已下架或链接无效">
-        <template #extra>
-          <el-button type="primary" @click="goHome">返回首页</el-button>
-        </template>
-      </el-result>
+  <UserLayout v-if="!error">
+    <LoadingOverlay v-if="loading" />
 
-      <article v-else-if="show" class="detail-shell">
-        <section class="hero-card">
-          <el-image v-if="coverUrl" class="hero-image" :src="coverUrl" fit="cover">
-            <template #error>
-              <div class="hero-placeholder">LIVE SHOW</div>
+    <template v-else-if="show">
+      <div class="glass-card rounded-2xl p-6 mb-6">
+        <div class="flex flex-col md:flex-row gap-6">
+          <div class="w-full md:w-48 h-64 rounded-xl bg-gradient-to-br from-purple-600 to-pink-500 flex items-center justify-center flex-shrink-0">
+            <img v-if="resolveCover(show.coverImage)" :src="resolveCover(show.coverImage)" class="w-full h-full object-cover rounded-xl" />
+            <span v-else class="text-white text-5xl font-bold">LIVE</span>
+          </div>
+          <div class="flex-1">
+            <StatusTag :type="tagType(show)" :label="labelText(show)" class="mb-2" />
+            <h2 class="text-2xl font-bold mb-2">{{ show.showName || show.title }}</h2>
+            <p class="text-gray-400">{{ formatDate(show.showTime) }}</p>
+            <p class="text-gray-400">{{ show.venue }}</p>
+            <div class="text-right mt-2">
+              <p class="text-sm text-gray-400">票价范围</p>
+              <p class="text-3xl font-bold text-neon-cyan font-orbitron">{{ show.priceRange || '¥' + show.ticketPrice }}</p>
+            </div>
+            <div class="grid grid-cols-4 gap-3 mt-4">
+              <div v-for="z in zones" :key="z.name" class="p-3 rounded-lg bg-white/5 text-center">
+                <p class="text-xs text-gray-400">{{ z.name }}</p>
+                <p class="text-lg font-bold" :class="z.color">¥{{ z.price }}</p>
+                <p class="text-xs" :class="z.stock > 10 ? 'text-green-400' : 'text-red-400'">剩余 {{ z.stock }} 张</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Seat Map + Order -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-2 glass-card rounded-2xl p-6">
+          <h3 class="text-lg font-bold mb-4">在线选座</h3>
+          <div class="stage-glow rounded-t-3xl p-4 mb-6 text-center">
+            <div class="w-full h-12 bg-gradient-to-b from-purple-500/30 to-transparent rounded-t-2xl flex items-center justify-center border-t-2 border-purple-400/50">
+              <span class="font-bold tracking-widest">舞台 STAGE</span>
+            </div>
+          </div>
+          <div class="grid grid-cols-[repeat(13,minmax(0,1fr))] gap-1 mb-6 justify-items-center">
+            <template v-for="row in seatRows" :key="row.label">
+              <span class="text-xs text-gray-500 self-center">{{ row.label }}</span>
+              <button
+                v-for="s in row.seats"
+                :key="s.id"
+                class="w-7 h-7 rounded text-[10px] transition-all duration-200"
+                :class="seatClass(s)"
+                :disabled="!s.available"
+                @click="toggleSeat(s)"
+              >{{ (s.seatNumber || '').slice(-2) }}</button>
             </template>
-          </el-image>
-          <div v-else class="hero-placeholder">LIVE SHOW</div>
-        </section>
-
-        <section class="detail-content">
-          <div class="title-row">
-            <div>
-              <p class="eyebrow">CONCERT DETAIL</p>
-              <h1>{{ show.showName || show.title }}</h1>
-            </div>
-            <el-tag :type="statusTagType(show)" effect="dark" size="large" round>
-              {{ displayStatus(show) }}
-            </el-tag>
           </div>
+          <div class="flex justify-center gap-5 text-sm">
+            <span class="flex items-center gap-1.5"><span class="w-4 h-4 rounded bg-gray-600 inline-block" /> 已售</span>
+            <span class="flex items-center gap-1.5"><span class="w-4 h-4 rounded bg-cyan-400/40 border border-cyan-400/50 inline-block" /> 可选</span>
+            <span class="flex items-center gap-1.5"><span class="w-4 h-4 rounded bg-gradient-to-br from-pink-500 to-purple-600 inline-block" /> 已选</span>
+          </div>
+        </div>
 
-          <div class="metadata-grid">
-            <div class="metadata-item">
-              <span>日期时间</span>
-              <strong>{{ formatDetailDate(show.showTime) }}</strong>
-            </div>
-            <div class="metadata-item">
-              <span>场馆</span>
-              <strong>📍 {{ show.venue }}</strong>
-            </div>
-            <div class="metadata-item">
-              <span>票价</span>
-              <strong>{{ formatPrice(show.ticketPrice) }}</strong>
-            </div>
-            <div class="metadata-item">
-              <span>座位</span>
-              <strong>{{ show.availableSeats }} / {{ show.totalSeats }}</strong>
+        <div class="glass-card rounded-2xl p-6">
+          <h3 class="text-lg font-bold mb-4">订单信息</h3>
+          <div v-if="selectedSeats.length === 0" class="text-gray-400 text-sm mb-4">请选择座位</div>
+          <div v-else class="space-y-2 mb-4 max-h-48 overflow-y-auto">
+            <div v-for="s in selectedSeats" :key="s.id" class="flex justify-between text-sm bg-white/5 rounded-lg p-3">
+              <span>{{ s.seatNumber }}</span>
+              <span class="text-neon-cyan font-bold">¥{{ s.price }}</span>
             </div>
           </div>
+          <div class="border-t border-white/10 pt-4 mb-4">
+            <div class="flex justify-between mb-2"><span class="text-gray-400">座位数量</span><span class="font-bold">{{ selectedSeats.length }}</span></div>
+            <div class="flex justify-between text-xl"><span>总计</span><span class="font-bold text-neon-cyan font-orbitron">¥{{ totalPrice }}</span></div>
+          </div>
+          <BaseButton variant="primary" size="lg" class="w-full" :disabled="selectedSeats.length === 0" :loading="submitting" @click="handleBuy">提交订单</BaseButton>
+          <p class="text-xs text-gray-500 mt-3 text-center">请在15分钟内完成支付，超时将释放座位</p>
+        </div>
+      </div>
 
-          <section class="content-section">
-            <h2>演出介绍</h2>
-            <p class="description">{{ show.description || '暂无演出介绍' }}</p>
-          </section>
-
-          <section class="content-section">
-            <h2>选座购票</h2>
-            <div v-if="seats.length" class="seat-map">
-              <div v-for="seat in seats" :key="seat.id" 
-                   class="seat-cell" 
-                   :class="{ available: seat.available, selected: selectedSeatId === seat.id, sold: !seat.available }"
-                   @click="selectSeat(seat)">
-                {{ seat.seatNumber }}
-              </div>
+      <!-- Reviews -->
+      <div class="glass-card rounded-2xl p-6 mt-6">
+        <h3 class="text-lg font-bold mb-4">观众评价</h3>
+        <div v-if="reviews.length" class="space-y-4">
+          <div v-for="r in reviews" :key="r.id" class="border-b border-white/5 pb-4 last:border-0">
+            <div class="flex items-center gap-3 mb-2">
+              <span class="text-sm font-bold text-white">{{ r.username }}</span>
+              <StarRating :model-value="r.rating" :readonly="true" />
+              <span class="text-xs text-gray-500">{{ formatDate(r.createdAt) }}</span>
             </div>
-            <div v-else class="empty-zone">座位信息加载中...</div>
-            <div v-if="selectedSeatId" class="seat-action-bar">
-              <span>已选: {{ selectedSeat?.seatNumber }} - ¥{{ selectedSeat?.price }}</span>
-              <el-button type="primary" @click="confirmOrder" :loading="ordering">确认购票</el-button>
-            </div>
-          </section>
+            <p class="text-sm text-gray-400">{{ r.content }}</p>
+          </div>
+        </div>
+        <EmptyState v-else description="暂无评价" />
+      </div>
+    </template>
 
-          <section class="content-section">
-            <h2>观众评价</h2>
-            <div v-if="reviews.length === 0" class="empty-zone">暂无评价</div>
-            <div v-else class="review-list">
-              <div class="review-summary">
-                <span class="avg-rating">{{ averageRating.toFixed(1) }}</span>
-                <el-rate v-model="averageRating" disabled show-score text-color="#ffd700" />
-                <span class="review-count">{{ reviews.length }} 条评价</span>
-              </div>
-              <div v-for="review in reviews" :key="review.id" class="review-card">
-                <div class="review-header">
-                  <span class="review-author">{{ review.username }}</span>
-                  <el-rate v-model="review.rating" disabled size="small" />
-                  <span class="review-time">{{ formatReviewTime(review.createdAt) }}</span>
-                </div>
-                <p class="review-content">{{ review.content }}</p>
-              </div>
-            </div>
-          </section>
-
-          <el-button class="back-button" size="large" @click="goHome">返回首页</el-button>
-        </section>
-      </article>
-    </main>
-  </el-config-provider>
+    <div v-else class="min-h-screen flex items-center justify-center">
+      <div class="glass-card rounded-2xl p-8 text-center max-w-md">
+        <p class="text-5xl mb-4 opacity-30">✘</p>
+        <h2 class="text-xl font-bold mb-2">演出不存在</h2>
+        <p class="text-gray-400 mb-6">该演出可能已下架或删除</p>
+        <BaseButton variant="primary" @click="router.push('/')">返回首页</BaseButton>
+      </div>
+    </div>
+  </UserLayout>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { ElMessage, ElMessageBox } from 'element-plus'
-import zhCn from 'element-plus/es/locale/lang/zh-cn'
+import { ref, computed, onMounted } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import { getShow, type ShowItem } from '../api/shows'
 import { getShowSeats, createOrder, type SeatItem } from '../api/orders'
 import { getShowReviews, type ReviewItem } from '../api/reviews'
+import { useToast } from '../composables/useToast'
+import { useGlobalConfirm } from '../composables/useConfirm'
+import UserLayout from '../components/UserLayout.vue'
+import StatusTag from '../components/StatusTag.vue'
+import StarRating from '../components/StarRating.vue'
+import EmptyState from '../components/EmptyState.vue'
+import LoadingOverlay from '../components/LoadingOverlay.vue'
+import BaseButton from '../components/BaseButton.vue'
 
-const route = useRoute()
 const router = useRouter()
+const route = useRoute()
+const toast = useToast()
+const confirm = useGlobalConfirm()
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
 
 const show = ref<ShowItem | null>(null)
-const loading = ref(false)
-const error = ref(false)
-
 const seats = ref<SeatItem[]>([])
-const selectedSeatId = ref<number | null>(null)
-const ordering = ref(false)
-
 const reviews = ref<ReviewItem[]>([])
-const averageRating = computed(() => reviews.value.length ? reviews.value.reduce((s, r) => s + r.rating, 0) / reviews.value.length : 0)
+const loading = ref(true)
+const error = ref(false)
+const selectedSeats = ref<SeatItem[]>([])
+const submitting = ref(false)
 
-const selectedSeat = computed(() => seats.value.find(s => s.id === selectedSeatId.value))
+const totalPrice = computed(() => selectedSeats.value.reduce((s, x) => s + x.price, 0))
 
-const coverUrl = computed(() => resolveCoverImage(show.value?.coverImage || null))
+const zones = computed(() => {
+  const prices = [...new Set(seats.value.map(s => s.price))].sort((a, b) => b - a)
+  const names = ['VIP区', 'A区', 'B区', 'C区']
+  const colors = ['text-yellow-400', 'text-purple-400', 'text-blue-400', 'text-cyan-400']
+  return prices.map((p, i) => ({ name: names[i] || `${i+1}区`, price: p, color: colors[i] || 'text-white', stock: seats.value.filter(s => s.price === p && s.available).length }))
+})
 
-function resolveCoverImage(coverImage: string | null) {
-  if (!coverImage) {
-    return ''
+const seatRows = computed(() => {
+  const rows = new Map<string, SeatItem[]>()
+  for (const s of seats.value) {
+    const row = s.seatNumber?.match(/[A-Za-z]+/)?.[0] || 'X'
+    if (!rows.has(row)) rows.set(row, [])
+    rows.get(row)!.push(s)
   }
-  if (/^(https?:)?\/\//.test(coverImage) || coverImage.startsWith('data:')) {
-    return coverImage
-  }
-  if (coverImage.startsWith('/uploads/')) {
-    return `${apiBaseUrl}${coverImage}`
-  }
-  return coverImage
+  return Array.from(rows.entries()).sort(([a], [b]) => a.localeCompare(b)).map(([label, seatList]) => ({ label, seats: seatList.sort((a, b) => (a.seatNumber || '').localeCompare(b.seatNumber || '')) }))
+})
+
+function seatClass(s: SeatItem) {
+  if (selectedSeats.value.find(x => x.id === s.id)) return 'bg-gradient-to-br from-pink-500 to-purple-600 shadow-lg shadow-pink-500/50'
+  if (!s.available) return 'bg-gray-600 cursor-not-allowed'
+  return 'bg-cyan-400/20 border border-cyan-400/50 hover:scale-110 hover:shadow-[0_0_12px] hover:shadow-neon-cyan/60'
 }
 
-function displayStatus(item: ShowItem) {
-  const status = item.statusText || item.status || ''
-  const upperStatus = status.toUpperCase()
-
-  if (status.includes('售票') || upperStatus.includes('ON_SALE') || upperStatus.includes('SELLING')) {
-    return '售票中'
-  }
-  if (status.includes('即将') || status.includes('开售') || upperStatus.includes('UPCOMING')) {
-    return '即将开售'
-  }
-  if (status.includes('结束') || upperStatus.includes('ENDED') || upperStatus.includes('FINISHED')) {
-    return '已结束'
-  }
-  return status || '未知状态'
+function toggleSeat(s: SeatItem) {
+  if (!s.available) return
+  const idx = selectedSeats.value.findIndex(x => x.id === s.id)
+  if (idx >= 0) selectedSeats.value.splice(idx, 1)
+  else if (selectedSeats.value.length < 4) selectedSeats.value.push(s)
+  else toast.warning('最多选择4个座位')
 }
 
-function statusTagType(item: ShowItem) {
-  const status = displayStatus(item)
-  if (status === '售票中') {
-    return 'success'
-  }
-  if (status === '即将开售') {
-    return 'warning'
-  }
-  return 'info'
-}
-
-function formatDetailDate(value: string) {
-  if (!value) {
-    return '时间待定'
-  }
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return value
-  }
-  const dateText = date.toLocaleDateString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  })
-  const timeText = date.toLocaleTimeString('zh-CN', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
-  })
-  return `${dateText.replace(/\//g, '年').replace('年', '年').replace('年', '年')} ${timeText}`.replace(/年(\d{2})年(\d{2})/, '年$1月$2日')
-}
-
-function formatPrice(value: number) {
-  return `¥${Number(value || 0).toFixed(2)}`
-}
-
-function formatReviewTime(value: string) {
-  if (!value) return ''
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
-  return date.toLocaleDateString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  }).replace(/\//g, '-')
-}
-
-async function fetchShow() {
-  const id = Number(route.params.id)
-  if (!Number.isFinite(id)) {
-    error.value = true
-    return
-  }
-
-  loading.value = true
-  error.value = false
+async function handleBuy() {
+  if (selectedSeats.value.length === 0) return
+  const ok = await confirm.open(`确认购买 ${selectedSeats.value.length} 个座位，总计 ¥${totalPrice.value}？`, '确认购票')
+  if (!ok) return
+  submitting.value = true
   try {
-    const response = await getShow(id)
-    show.value = response.data.data
-    await fetchSeats(id)
-    await fetchReviews(id)
-  } catch {
-    show.value = null
-    error.value = true
-  } finally {
-    loading.value = false
-  }
-}
-
-async function fetchReviews(showId: number) {
-  try {
-    const res = await getShowReviews(showId)
-    reviews.value = res.data.data || []
-  } catch {
-    reviews.value = []
-  }
-}
-
-async function fetchSeats(showId: number) {
-  try {
-    const res = await getShowSeats(showId)
-    seats.value = res.data.data || []
-  } catch (err) {
-    console.error('Failed to fetch seats', err)
-  }
-}
-
-function selectSeat(seat: SeatItem) {
-  if (!seat.available) return
-  if (selectedSeatId.value === seat.id) {
-    selectedSeatId.value = null
-  } else {
-    selectedSeatId.value = seat.id
-  }
-}
-
-async function confirmOrder() {
-  if (!selectedSeat.value || !show.value) return
-  
-  try {
-    await ElMessageBox.confirm(
-      `确认购买 ${selectedSeat.value.seatNumber} 座位？\n价格: ¥${selectedSeat.value.price}`,
-      '确认购票',
-      {
-        confirmButtonText: '确认',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }
-    )
-    
-    ordering.value = true
-    const res = await createOrder({
-      showId: show.value.id,
-      ticketId: selectedSeat.value.id
-    })
-    
-    ElMessage.success(`购票成功！订单号: ${res.data.data.orderNo}`)
+    const ticket = selectedSeats.value[0]
+    await createOrder({ showId: ticket.showId, ticketId: ticket.id })
+    toast.success('购票成功')
     router.push('/orders')
-  } catch (err: any) {
-    if (err !== 'cancel') {
-      ElMessage.error(err.response?.data?.message || '购票失败')
-    }
-  } finally {
-    ordering.value = false
-  }
+  } catch { toast.error('购票失败') } finally { submitting.value = false }
 }
 
-function goHome() {
-  router.push('/')
+function resolveCover(img: string | null) {
+  if (!img) return ''
+  if (/^(https?:)?\/\//.test(img) || img.startsWith('data:')) return img
+  if (img.startsWith('/uploads/')) return `${apiBaseUrl}${img}`
+  return img
 }
 
-onMounted(fetchShow)
+function labelText(s: ShowItem) {
+  const st = (s.statusText || s.status || '').toUpperCase()
+  if (st.includes('ON_SALE')) return '售票中'
+  if (st.includes('UPCOMING')) return '即将开售'
+  if (st.includes('ENDED')) return '已结束'
+  return s.statusText || s.status || '未知'
+}
+
+function tagType(s: ShowItem) {
+  const st = labelText(s)
+  if (st === '售票中') return 'success' as const
+  if (st === '即将开售') return 'warning' as const
+  return 'info' as const
+}
+
+function formatDate(v: string | null) {
+  if (!v) return ''
+  const d = new Date(v)
+  return Number.isNaN(d.getTime()) ? v : d.toLocaleString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })
+}
+
+onMounted(async () => {
+  const id = Number(route.params.id)
+  if (!id || Number.isNaN(id)) { error.value = true; loading.value = false; return }
+  try {
+    const [showRes, seatsRes, reviewsRes] = await Promise.all([getShow(id), getShowSeats(id), getShowReviews(id)])
+    show.value = showRes.data.data
+    seats.value = seatsRes.data.data || []
+    reviews.value = reviewsRes.data.data || []
+  } catch { error.value = true } finally { loading.value = false }
+})
 </script>
-
-<style scoped>
-.detail-page {
-  min-height: 100vh;
-  padding: 40px clamp(16px, 5vw, 72px);
-  color: #eee;
-  background:
-    radial-gradient(circle at 76% 0%, rgba(255, 215, 0, 0.18), transparent 28%),
-    radial-gradient(circle at 12% 18%, rgba(233, 69, 96, 0.28), transparent 32%),
-    linear-gradient(135deg, #1a1a2e 0%, #16213e 56%, #0c0d1f 100%);
-}
-
-.detail-shell {
-  max-width: 1120px;
-  margin: 0 auto;
-}
-
-.hero-card {
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 28px;
-  box-shadow: 0 26px 70px rgba(0, 0, 0, 0.34);
-}
-
-.hero-image,
-.hero-placeholder {
-  width: 100%;
-  height: min(50vw, 400px);
-  min-height: 240px;
-}
-
-.hero-placeholder {
-  display: grid;
-  place-items: center;
-  color: rgba(255, 255, 255, 0.86);
-  font-size: clamp(34px, 7vw, 82px);
-  font-weight: 900;
-  letter-spacing: 0.16em;
-  background:
-    linear-gradient(120deg, rgba(233, 69, 96, 0.92), rgba(22, 33, 62, 0.96)),
-    repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.13) 0 1px, transparent 1px 14px);
-}
-
-.detail-content {
-  margin-top: 32px;
-  padding: clamp(22px, 4vw, 42px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 28px;
-  background: rgba(255, 255, 255, 0.08);
-  box-shadow: 0 20px 58px rgba(0, 0, 0, 0.24);
-}
-
-.title-row {
-  display: flex;
-  gap: 20px;
-  align-items: flex-start;
-  justify-content: space-between;
-}
-
-.eyebrow {
-  margin: 0 0 10px;
-  color: #ffd700;
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.24em;
-}
-
-h1 {
-  margin: 0;
-  color: #fff;
-  font-family: 'Noto Serif SC', 'Songti SC', serif;
-  font-size: clamp(34px, 6vw, 64px);
-  line-height: 1.08;
-}
-
-.metadata-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 16px;
-  margin: 34px 0;
-}
-
-.metadata-item {
-  min-height: 96px;
-  padding: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 18px;
-  background: rgba(0, 0, 0, 0.16);
-}
-
-.metadata-item span {
-  display: block;
-  margin-bottom: 10px;
-  color: rgba(255, 215, 0, 0.82);
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.metadata-item strong {
-  color: #fff;
-  font-size: 17px;
-  line-height: 1.45;
-}
-
-.content-section {
-  margin-top: 28px;
-}
-
-.content-section h2 {
-  margin: 0 0 14px;
-  color: #ffd700;
-  font-size: 22px;
-}
-
-.description {
-  margin: 0;
-  color: rgba(238, 238, 238, 0.84);
-  font-size: 16px;
-  line-height: 1.8;
-  white-space: pre-wrap;
-}
-
-.seat-zones,
-.empty-zone {
-  margin: 0;
-  padding: 18px;
-  overflow-x: auto;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 16px;
-  color: #f7f0d0;
-  background: rgba(0, 0, 0, 0.28);
-}
-
-.seat-zones {
-  font-family: 'Cascadia Code', 'Consolas', monospace;
-  line-height: 1.6;
-  white-space: pre-wrap;
-}
-
-.empty-zone {
-  color: rgba(238, 238, 238, 0.68);
-}
-
-.seat-map {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
-  gap: 8px;
-  max-width: 600px;
-}
-
-.seat-cell {
-  width: 60px;
-  height: 44px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 600;
-  transition: background 0.2s, border 0.2s, box-shadow 0.2s, color 0.2s;
-}
-
-.seat-cell.available {
-  background: rgba(76, 175, 80, 0.35);
-  border: 1px solid rgba(76, 175, 80, 0.6);
-  color: #a5d6a7;
-}
-
-.seat-cell.available:hover {
-  background: rgba(76, 175, 80, 0.5);
-}
-
-.seat-cell.sold {
-  background: rgba(158, 158, 158, 0.2);
-  border: 1px solid rgba(158, 158, 158, 0.3);
-  color: rgba(238, 238, 238, 0.35);
-  cursor: not-allowed;
-}
-
-.seat-cell.selected {
-  background: rgba(255, 215, 0, 0.35);
-  border: 2px solid #ffd700;
-  box-shadow: 0 0 12px rgba(255, 215, 0, 0.4);
-  color: #ffd700;
-}
-
-.seat-action-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 20px;
-  padding: 16px 20px;
-  border: 1px solid rgba(255, 215, 0, 0.3);
-  border-radius: 14px;
-  background: rgba(0, 0, 0, 0.24);
-  color: #eee;
-  font-size: 15px;
-}
-
-.review-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.review-summary {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 16px 20px;
-  border: 1px solid rgba(255, 215, 0, 0.3);
-  border-radius: 14px;
-  background: rgba(0, 0, 0, 0.24);
-}
-
-.avg-rating {
-  font-size: 32px;
-  font-weight: 900;
-  color: #ffd700;
-}
-
-.review-count {
-  color: rgba(238, 238, 238, 0.6);
-  font-size: 14px;
-  margin-left: auto;
-}
-
-.review-card {
-  padding: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.05);
-}
-
-.review-header {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-
-.review-author {
-  font-weight: 700;
-  color: #eee;
-}
-
-.review-time {
-  color: rgba(238, 238, 238, 0.5);
-  font-size: 12px;
-  margin-left: auto;
-}
-
-.review-content {
-  color: rgba(238, 238, 238, 0.8);
-  margin: 10px 0 0;
-  line-height: 1.6;
-  white-space: pre-wrap;
-}
-
-.back-button {
-  margin-top: 30px;
-}
-
-@media (max-width: 900px) {
-  .metadata-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-@media (max-width: 560px) {
-  .title-row {
-    flex-direction: column;
-  }
-
-  .metadata-grid {
-    grid-template-columns: 1fr;
-  }
-}
-</style>

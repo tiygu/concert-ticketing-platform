@@ -1,4 +1,5 @@
 import request from '../utils/request'
+import type { ApiResult } from '@/types/api'
 
 export interface NoticeItem {
   id: number;
@@ -10,12 +11,6 @@ export interface NoticeItem {
   publisherId: number | null;
   createdAt: string;
   updatedAt: string;
-}
-
-export interface ApiResult<T> {
-  code: number;
-  message: string;
-  data: T;
 }
 
 export function getNotices() {
