@@ -1,0 +1,42 @@
+package com.concert.ticketing.show.dto;
+
+import lombok.Data;
+import org.springframework.format.annotation.DateTimeFormat;
+
+import javax.validation.constraints.DecimalMin;
+import javax.validation.constraints.Min;
+import javax.validation.constraints.NotBlank;
+import javax.validation.constraints.NotNull;
+import javax.validation.constraints.Size;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
+@Data
+public class ShowCreateRequest {
+
+    @NotBlank(message = "演出标题不能为空")
+    @Size(max = 100, message = "演出标题不能超过100个字符")
+    private String title;
+
+    @NotBlank(message = "演出场馆不能为空")
+    @Size(max = 100, message = "演出场馆不能超过100个字符")
+    private String venue;
+
+    @NotNull(message = "演出时间不能为空")
+    @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+    private LocalDateTime showTime;
+
+    @NotNull(message = "票价不能为空")
+    @DecimalMin(value = "0.00", message = "票价不能小于0")
+    private BigDecimal ticketPrice;
+
+    @NotNull(message = "座位总数不能为空")
+    @Min(value = 1, message = "座位总数必须大于0")
+    private Integer totalSeats;
+
+    @Size(max = 2000, message = "演出描述不能超过2000个字符")
+    private String description;
+
+    @Size(max = 4000, message = "座位区域数据不能超过4000个字符")
+    private String seatZones;
+}
