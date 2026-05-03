@@ -5,23 +5,74 @@ const routes: Array<RouteRecordRaw> = [
   {
     path: '/',
     name: 'Home',
-    component: HomePage
+    component: HomePage,
+    meta: { requiresAuth: true }
   },
   {
     path: '/shows/:id',
     name: 'ShowDetail',
-    component: () => import('../views/ShowDetail.vue')
+    component: () => import('../views/ShowDetail.vue'),
+    meta: { requiresAuth: true }
   },
   {
     path: '/admin/shows',
     name: 'ShowManage',
-    component: () => import('../views/admin/ShowManage.vue')
+    component: () => import('../views/admin/ShowManage.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true }
+  },
+  {
+    path: '/login',
+    name: 'Login',
+    component: () => import('../views/LoginPage.vue'),
+    meta: { guest: true }
+  },
+  {
+    path: '/register',
+    name: 'Register',
+    component: () => import('../views/RegisterPage.vue'),
+    meta: { guest: true }
   }
 ]
 
 const router = createRouter({
   history: createWebHistory(),
   routes
+})
+
+// Navigation guard
+router.beforeEach((to, _from, next) => {
+  const accessToken = localStorage.getItem('accessToken')
+  const userInfoStr = localStorage.getItem('userInfo')
+  let isAdmin = false
+
+  if (userInfoStr) {
+    try {
+      const userInfo = JSON.parse(userInfoStr)
+      isAdmin = userInfo.role === 'ADMIN'
+    } catch {
+      // ignore parse error
+    }
+  }
+
+  // If visiting guest-only routes (login/register) while logged in, redirect to home
+  if (to.meta.guest && accessToken) {
+    next('/')
+    return
+  }
+
+  // If route requires auth and user is not logged in
+  if (to.meta.requiresAuth && !accessToken) {
+    next({ path: '/login', query: { redirect: to.fullPath } })
+    return
+  }
+
+  // If route requires admin and user is not admin
+  if (to.meta.requiresAdmin && !isAdmin) {
+    next('/')
+    return
+  }
+
+  next()
 })
 
 export default router
