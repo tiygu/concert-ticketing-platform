@@ -25,6 +25,10 @@ export function getVipPackages() {
   return request.get<ApiResult<VipPackageItem[]>>('/api/admin/vip/packages')
 }
 
+export function getAvailableVipPackages() {
+  return request.get<ApiResult<VipPackageItem[]>>('/api/user/vip/packages')
+}
+
 export function createVipPackage(data: { packageName: string; benefits?: string; usageLimit?: string; validPeriod?: string; userLevelRequired?: number; stock?: number }) {
   return request.post<ApiResult<VipPackageItem>>('/api/admin/vip/packages', data)
 }

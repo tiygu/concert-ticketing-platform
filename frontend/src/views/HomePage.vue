@@ -1,6 +1,19 @@
 <template>
   <el-config-provider :locale="zhCn">
     <main class="home-page">
+      <header class="top-nav">
+        <div class="nav-left">
+          <span class="logo">TICKET</span>
+        </div>
+        <div class="nav-right">
+          <el-button link @click="router.push('/profile')">个人中心</el-button>
+          <el-button link @click="router.push('/orders')">我的订单</el-button>
+          <el-button link @click="router.push('/vip')">VIP权益中心</el-button>
+          <el-button link @click="router.push('/vip/bookings')">我的预约</el-button>
+          <el-button link type="danger" @click="logout">退出登录</el-button>
+        </div>
+      </header>
+
       <section class="hero-section">
         <div class="hero-copy">
           <p class="eyebrow">LIVE CONCERT TICKETS</p>
@@ -240,6 +253,12 @@ function goToShow(id: number) {
   router.push(`/shows/${id}`)
 }
 
+function logout() {
+  localStorage.removeItem('accessToken')
+  localStorage.removeItem('userInfo')
+  router.push('/login')
+}
+
 watch(keyword, scheduleSearch)
 
 onMounted(() => {
@@ -255,6 +274,44 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.top-nav {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  max-width: 1240px;
+  margin: 0 auto 40px;
+  padding: 0 16px;
+}
+
+.logo {
+  font-size: 24px;
+  font-weight: 900;
+  color: #ffd700;
+  letter-spacing: 0.1em;
+}
+
+.nav-right {
+  display: flex;
+  gap: 16px;
+}
+
+.nav-right :deep(.el-button) {
+  color: rgba(238, 238, 238, 0.85);
+  font-size: 15px;
+}
+
+.nav-right :deep(.el-button:hover) {
+  color: #ffd700;
+}
+
+.nav-right :deep(.el-button--danger) {
+  color: #e94560;
+}
+
+.nav-right :deep(.el-button--danger:hover) {
+  color: #ff6b81;
+}
+
 .home-page {
   min-height: 100vh;
   padding: 48px clamp(20px, 5vw, 72px);

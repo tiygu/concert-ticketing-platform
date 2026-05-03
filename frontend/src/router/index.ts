@@ -69,6 +69,24 @@ const routes: Array<RouteRecordRaw> = [
     meta: { requiresAuth: true, requiresAdmin: true }
   },
   {
+    path: '/admin/vip/bookings',
+    name: 'VipBookingManage',
+    component: () => import('../views/admin/VipBookingManage.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true }
+  },
+  {
+    path: '/vip',
+    name: 'VipCenter',
+    component: () => import('../views/VipCenter.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/vip/bookings',
+    name: 'MyVipBookings',
+    component: () => import('../views/MyVipBookings.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
     path: '/login',
     name: 'Login',
     component: () => import('../views/LoginPage.vue'),

@@ -30,6 +30,16 @@ public class VipPackageServiceImpl implements VipPackageService {
     }
 
     @Override
+    public List<VipPackage> listAvailablePackages(Integer vipLevel) {
+        return vipPackageMapper.selectList(
+                new LambdaQueryWrapper<VipPackage>()
+                        .eq(VipPackage::getStatus, ACTIVE_STATUS)
+                        .le(VipPackage::getUserLevelRequired, vipLevel)
+                        .orderByDesc(VipPackage::getCreatedAt)
+        );
+    }
+
+    @Override
     @Transactional(rollbackFor = Exception.class)
     public VipPackage createPackage(VipPackageCreateRequest req) {
         VipPackage vipPackage = new VipPackage();

@@ -10,6 +10,8 @@ public interface VipPackageService {
 
     List<VipPackage> listPackages();
 
+    List<VipPackage> listAvailablePackages(Integer vipLevel);
+
     VipPackage createPackage(VipPackageCreateRequest req);
 
     VipPackage updatePackage(Long id, VipPackageUpdateRequest req);
