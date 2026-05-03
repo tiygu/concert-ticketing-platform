@@ -63,6 +63,12 @@ const routes: Array<RouteRecordRaw> = [
     meta: { requiresAuth: true, requiresAdmin: true }
   },
   {
+    path: '/admin/statistics',
+    name: 'Statistics',
+    component: () => import('../views/admin/Statistics.vue'),
+    meta: { requiresAuth: true, requiresAdmin: true }
+  },
+  {
     path: '/admin/vip/packages',
     name: 'VipPackageManage',
     component: () => import('../views/admin/VipPackageManage.vue'),

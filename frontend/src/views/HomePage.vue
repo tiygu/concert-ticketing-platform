@@ -6,6 +6,7 @@
           <span class="logo">TICKET</span>
         </div>
         <div class="nav-right">
+          <el-button v-if="isAdmin" link @click="router.push('/admin/statistics')">数据统计</el-button>
           <el-button link @click="router.push('/profile')">个人中心</el-button>
           <el-button link @click="router.push('/orders')">我的订单</el-button>
           <el-button link @click="router.push('/vip')">VIP权益中心</el-button>
@@ -130,6 +131,7 @@ const keyword = ref('')
 const page = ref(1)
 const pageSize = ref(9)
 const total = ref(0)
+const isAdmin = ref(false)
 let searchTimer: ReturnType<typeof window.setTimeout> | undefined
 
 function resolveCoverImage(coverImage: string | null) {
@@ -262,6 +264,15 @@ function logout() {
 watch(keyword, scheduleSearch)
 
 onMounted(() => {
+  const userInfoStr = localStorage.getItem('userInfo')
+  if (userInfoStr) {
+    try {
+      const userInfo = JSON.parse(userInfoStr)
+      isAdmin.value = userInfo.role === 'ADMIN'
+    } catch {
+      // ignore
+    }
+  }
   fetchShows()
   fetchNotices()
 })
