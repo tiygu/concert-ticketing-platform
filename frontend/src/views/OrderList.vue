@@ -7,6 +7,17 @@
           <el-button @click="goHome">返回首页</el-button>
         </div>
 
+        <div class="status-tabs">
+          <button
+            v-for="tab in statusTabs"
+            :key="tab.key"
+            :class="['status-tab', { active: activeStatus === tab.key }]"
+            @click="switchStatus(tab.key)"
+          >
+            {{ tab.label }}
+          </button>
+        </div>
+
         <div v-loading="loading" class="order-content" element-loading-background="rgba(26, 26, 46, 0.72)">
           <el-empty v-if="!loading && orders.length === 0" description="暂无订单" />
 
@@ -15,15 +26,14 @@
               v-for="order in orders"
               :key="order.id"
               class="order-card"
-              @click="goDetail(order.id)"
             >
-              <div class="order-card-header">
+              <div class="order-card-header" @click="goDetail(order.id)">
                 <span class="order-no">{{ order.orderNo }}</span>
                 <el-tag :type="payStatusType(order.payStatus)" effect="dark" size="small" round>
                   {{ order.statusText || payStatusLabel(order.payStatus) }}
                 </el-tag>
               </div>
-              <div class="order-card-body">
+              <div class="order-card-body" @click="goDetail(order.id)">
                 <div class="order-field">
                   <span class="field-label">演出</span>
                   <strong>{{ order.showName }}</strong>
@@ -45,6 +55,17 @@
                 <el-button type="primary" text size="small" @click.stop="goDetail(order.id)">
                   查看详情
                 </el-button>
+                <template v-if="order.payStatus === 'PENDING'">
+                  <el-button type="primary" size="small" :loading="payingId === order.id" @click.stop="handlePay(order.id)">
+                    立即支付
+                  </el-button>
+                  <el-button type="danger" text size="small" :loading="cancellingId === order.id" @click.stop="handleCancel(order.id)">
+                    取消订单
+                  </el-button>
+                </template>
+                <el-button v-else-if="order.payStatus === 'PAID'" type="success" text size="small" @click.stop="handleComplete">
+                  确认完成
+                </el-button>
               </div>
             </div>
           </div>
@@ -58,30 +79,36 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
-import { getUserOrders, type OrderItem } from '../api/orders'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { getUserOrders, payOrder, cancelOrder, type OrderItem } from '../api/orders'
 
 const router = useRouter()
 const orders = ref<OrderItem[]>([])
 const loading = ref(false)
+const activeStatus = ref('')
+const payingId = ref<number | null>(null)
+const cancellingId = ref<number | null>(null)
+
+const statusTabs = [
+  { key: '', label: '全部' },
+  { key: 'PENDING', label: '待支付' },
+  { key: 'PAID', label: '已支付' },
+  { key: 'COMPLETED', label: '已完成' },
+  { key: 'CANCELLED', label: '已取消' }
+]
 
 function payStatusLabel(status: string) {
   const map: Record<string, string> = {
-    PENDING: '待支付',
-    PAID: '已支付',
-    COMPLETED: '已完成',
-    CANCELLED: '已取消',
-    REJECTED: '已驳回'
+    PENDING: '待支付', PAID: '已支付', COMPLETED: '已完成',
+    CANCELLED: '已取消', REJECTED: '已驳回'
   }
   return map[status] || status
 }
 
 function payStatusType(status: string) {
   const map: Record<string, string> = {
-    PENDING: 'warning',
-    PAID: 'success',
-    COMPLETED: 'info',
-    CANCELLED: 'danger',
-    REJECTED: 'danger'
+    PENDING: 'warning', PAID: 'success', COMPLETED: 'info',
+    CANCELLED: 'danger', REJECTED: 'danger'
   }
   return (map[status] || 'info') as 'warning' | 'success' | 'info' | 'danger'
 }
@@ -91,25 +118,67 @@ function formatDate(value: string) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
   return date.toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false
   })
+}
+
+function switchStatus(key: string) {
+  activeStatus.value = key
+  fetchOrders()
 }
 
 async function fetchOrders() {
   loading.value = true
   try {
-    const res = await getUserOrders()
+    const res = await getUserOrders(activeStatus.value || undefined)
     orders.value = res.data.data || []
   } catch {
     orders.value = []
   } finally {
     loading.value = false
   }
+}
+
+async function handlePay(id: number) {
+  payingId.value = id
+  try {
+    await payOrder(id)
+    ElMessage.success('支付成功')
+    await fetchOrders()
+  } catch (e: any) {
+    const msg = e?.response?.data?.message || e?.message || '支付失败'
+    ElMessage.error(msg)
+  } finally {
+    payingId.value = null
+  }
+}
+
+async function handleCancel(id: number) {
+  try {
+    await ElMessageBox.confirm('确定取消该订单吗？取消后将释放座位。', '确认取消', {
+      confirmButtonText: '确定取消',
+      cancelButtonText: '我再想想',
+      type: 'warning'
+    })
+  } catch {
+    return
+  }
+  cancellingId.value = id
+  try {
+    await cancelOrder(id)
+    ElMessage.success('订单已取消')
+    await fetchOrders()
+  } catch (e: any) {
+    const msg = e?.response?.data?.message || e?.message || '取消失败'
+    ElMessage.error(msg)
+  } finally {
+    cancellingId.value = null
+  }
+}
+
+function handleComplete() {
+  ElMessage.info('功能开发中，敬请期待')
 }
 
 function goDetail(id: number) {
@@ -134,99 +203,79 @@ onMounted(fetchOrders)
     linear-gradient(135deg, #1a1a2e 0%, #16213e 56%, #0c0d1f 100%);
 }
 
-.page-shell {
-  max-width: 900px;
-  margin: 0 auto;
-}
+.page-shell { max-width: 900px; margin: 0 auto; }
 
 .page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 28px;
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px;
 }
 
 .page-header h1 {
-  margin: 0;
-  color: #fff;
+  margin: 0; color: #fff;
   font-family: 'Noto Serif SC', 'Songti SC', serif;
   font-size: clamp(28px, 5vw, 42px);
 }
 
-.order-content {
-  min-height: 200px;
+.status-tabs {
+  display: flex; gap: 8px; margin-bottom: 24px; flex-wrap: wrap;
 }
 
-.order-cards {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+.status-tab {
+  padding: 8px 18px; border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 22px; background: rgba(255, 255, 255, 0.05);
+  color: rgba(238, 238, 238, 0.72); font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all 0.2s;
 }
+
+.status-tab:hover {
+  border-color: rgba(255, 215, 0, 0.4); color: #ffd700;
+}
+
+.status-tab.active {
+  border-color: #ffd700; background: rgba(255, 215, 0, 0.12); color: #ffd700;
+}
+
+.order-content { min-height: 200px; }
+
+.order-cards { display: flex; flex-direction: column; gap: 16px; }
 
 .order-card {
-  padding: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.08);
+  padding: 20px; border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 18px; background: rgba(255, 255, 255, 0.08);
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.18);
-  cursor: pointer;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
-.order-card:hover {
-  border-color: rgba(255, 215, 0, 0.35);
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.28);
-}
+.order-card:hover { border-color: rgba(255, 215, 0, 0.35); box-shadow: 0 12px 36px rgba(0, 0, 0, 0.28); }
+
+.order-card-header, .order-card-body { cursor: pointer; }
 
 .order-card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 14px;
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;
 }
 
 .order-no {
-  color: rgba(255, 215, 0, 0.82);
-  font-size: 13px;
-  font-weight: 800;
-  letter-spacing: 0.06em;
+  color: rgba(255, 215, 0, 0.82); font-size: 13px; font-weight: 800; letter-spacing: 0.06em;
 }
 
 .order-card-body {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px 24px;
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 24px;
 }
 
-.order-field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
+.order-field { display: flex; flex-direction: column; gap: 4px; }
 
-.field-label {
-  color: rgba(238, 238, 238, 0.55);
-  font-size: 12px;
-  font-weight: 600;
-}
+.field-label { color: rgba(238, 238, 238, 0.55); font-size: 12px; font-weight: 600; }
 
-.order-field strong {
-  color: #fff;
-  font-size: 15px;
-}
+.order-field strong { color: #fff; font-size: 15px; }
 
-.amount {
-  color: #ffd700 !important;
-}
+.amount { color: #ffd700 !important; }
 
 .order-card-footer {
-  margin-top: 12px;
-  text-align: right;
+  display: flex; align-items: center; justify-content: flex-end; gap: 10px;
+  margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 @media (max-width: 560px) {
-  .order-card-body {
-    grid-template-columns: 1fr;
-  }
+  .order-card-body { grid-template-columns: 1fr; }
+  .order-card-footer { flex-wrap: wrap; }
 }
 </style>

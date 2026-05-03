@@ -54,7 +54,14 @@
 
         <div class="action-bar">
           <el-button @click="goOrders">返回订单列表</el-button>
-          <el-button type="primary" @click="goHome">返回首页</el-button>
+          <template v-if="order.payStatus === 'PENDING'">
+            <el-button type="primary" :loading="paying" @click="handlePay">立即支付</el-button>
+            <el-button type="danger" :loading="cancelling" @click="handleCancel">取消订单</el-button>
+          </template>
+          <el-button v-else-if="order.payStatus === 'PAID'" type="success" @click="handleComplete">
+            确认完成
+          </el-button>
+          <el-button type="primary" plain @click="goHome">返回首页</el-button>
         </div>
       </div>
     </main>
@@ -65,7 +72,8 @@
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
-import { getOrderDetail, type OrderItem } from '../api/orders'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { getOrderDetail, payOrder, cancelOrder, type OrderItem } from '../api/orders'
 
 const route = useRoute()
 const router = useRouter()
@@ -73,34 +81,27 @@ const router = useRouter()
 const order = ref<OrderItem | null>(null)
 const loading = ref(false)
 const error = ref(false)
+const paying = ref(false)
+const cancelling = ref(false)
 
 function payStatusLabel(status: string) {
   const map: Record<string, string> = {
-    PENDING: '待支付',
-    PAID: '已支付',
-    COMPLETED: '已完成',
-    CANCELLED: '已取消',
-    REJECTED: '已驳回'
+    PENDING: '待支付', PAID: '已支付', COMPLETED: '已完成',
+    CANCELLED: '已取消', REJECTED: '已驳回'
   }
   return map[status] || status
 }
 
 function payStatusType(status: string) {
   const map: Record<string, string> = {
-    PENDING: 'warning',
-    PAID: 'success',
-    COMPLETED: 'info',
-    CANCELLED: 'danger',
-    REJECTED: 'danger'
+    PENDING: 'warning', PAID: 'success', COMPLETED: 'info',
+    CANCELLED: 'danger', REJECTED: 'danger'
   }
   return (map[status] || 'info') as 'warning' | 'success' | 'info' | 'danger'
 }
 
 function ticketTypeLabel(type: string) {
-  const map: Record<string, string> = {
-    REGULAR: '普通票',
-    VIP: 'VIP票'
-  }
+  const map: Record<string, string> = { REGULAR: '普通票', VIP: 'VIP票' }
   return map[type] || type
 }
 
@@ -109,42 +110,64 @@ function formatDate(value: string) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return value
   return date.toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', hour12: false
   })
 }
 
 async function fetchOrder() {
   const id = Number(route.params.id)
-  if (!Number.isFinite(id)) {
-    error.value = true
-    return
-  }
-
-  loading.value = true
-  error.value = false
+  if (!Number.isFinite(id)) { error.value = true; return }
+  loading.value = true; error.value = false
   try {
     const res = await getOrderDetail(id)
     order.value = res.data.data
   } catch {
-    order.value = null
-    error.value = true
+    order.value = null; error.value = true
   } finally {
     loading.value = false
   }
 }
 
-function goOrders() {
-  router.push('/orders')
+async function handlePay() {
+  paying.value = true
+  try {
+    await payOrder(order.value!.id)
+    ElMessage.success('支付成功')
+    await fetchOrder()
+  } catch (e: any) {
+    const msg = e?.response?.data?.message || e?.message || '支付失败'
+    ElMessage.error(msg)
+  } finally {
+    paying.value = false
+  }
 }
 
-function goHome() {
-  router.push('/')
+async function handleCancel() {
+  try {
+    await ElMessageBox.confirm('确定取消该订单吗？取消后将释放座位。', '确认取消', {
+      confirmButtonText: '确定取消', cancelButtonText: '我再想想', type: 'warning'
+    })
+  } catch { return }
+  cancelling.value = true
+  try {
+    await cancelOrder(order.value!.id)
+    ElMessage.success('订单已取消')
+    await fetchOrder()
+  } catch (e: any) {
+    const msg = e?.response?.data?.message || e?.message || '取消失败'
+    ElMessage.error(msg)
+  } finally {
+    cancelling.value = false
+  }
 }
+
+function handleComplete() {
+  ElMessage.info('功能开发中，敬请期待')
+}
+
+function goOrders() { router.push('/orders') }
+function goHome() { router.push('/') }
 
 onMounted(fetchOrder)
 </script>
@@ -160,21 +183,14 @@ onMounted(fetchOrder)
     linear-gradient(135deg, #1a1a2e 0%, #16213e 56%, #0c0d1f 100%);
 }
 
-.detail-shell {
-  max-width: 800px;
-  margin: 0 auto;
-}
+.detail-shell { max-width: 800px; margin: 0 auto; }
 
 .detail-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 28px;
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px;
 }
 
 .detail-header h1 {
-  margin: 0;
-  color: #fff;
+  margin: 0; color: #fff;
   font-family: 'Noto Serif SC', 'Songti SC', serif;
   font-size: clamp(28px, 5vw, 42px);
 }
@@ -182,48 +198,27 @@ onMounted(fetchOrder)
 .detail-card {
   padding: clamp(22px, 4vw, 42px);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 28px;
-  background: rgba(255, 255, 255, 0.08);
+  border-radius: 28px; background: rgba(255, 255, 255, 0.08);
   box-shadow: 0 20px 58px rgba(0, 0, 0, 0.24);
 }
 
 .detail-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 20px 32px;
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 32px;
 }
 
-.detail-field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
+.detail-field { display: flex; flex-direction: column; gap: 6px; }
 
-.field-label {
-  color: rgba(255, 215, 0, 0.82);
-  font-size: 13px;
-  font-weight: 800;
-}
+.field-label { color: rgba(255, 215, 0, 0.82); font-size: 13px; font-weight: 800; }
 
-.detail-field strong {
-  color: #fff;
-  font-size: 16px;
-  line-height: 1.45;
-}
+.detail-field strong { color: #fff; font-size: 16px; line-height: 1.45; }
 
-.amount {
-  color: #ffd700 !important;
-}
+.amount { color: #ffd700 !important; }
 
 .action-bar {
-  display: flex;
-  gap: 12px;
-  margin-top: 28px;
+  display: flex; gap: 12px; margin-top: 28px; flex-wrap: wrap;
 }
 
 @media (max-width: 560px) {
-  .detail-grid {
-    grid-template-columns: 1fr;
-  }
+  .detail-grid { grid-template-columns: 1fr; }
 }
 </style>

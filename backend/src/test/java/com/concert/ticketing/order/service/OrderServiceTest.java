@@ -1,5 +1,6 @@
 package com.concert.ticketing.order.service;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.concert.ticketing.common.exception.BizException;
 import com.concert.ticketing.order.dto.OrderCreateRequest;
 import com.concert.ticketing.order.entity.Order;
@@ -44,6 +45,9 @@ class OrderServiceTest {
 
     @Autowired
     private TicketService ticketService;
+
+    @Autowired
+    private OrderTimeoutService orderTimeoutService;
 
     @Autowired
     private MockMvc mockMvc;
@@ -195,6 +199,118 @@ class OrderServiceTest {
                 .andExpect(jsonPath("$.data.payStatus").value("PENDING"))
                 .andExpect(jsonPath("$.data.statusText").value("待支付"))
                 .andExpect(jsonPath("$.data.showName").value("接口订单演唱会"));
+    }
+
+    @Test
+    @DisplayName("should_支付订单并支持重复支付幂等返回")
+    void should_pay_order_and_return_paid_order_when_already_paid() {
+        insertUser(100L, "alice");
+        insertShow(1L, "支付测试演唱会");
+        insertTicket(1L, 1L, "REGULAR", "看台", "A1", 280.00, 0, 1);
+        insertOrder(1L, "ORD1", 100L, 1L, 1L, "A1", "2026-05-03 10:00:00");
+
+        Order paidOrder = orderService.payOrder(1L, 100L);
+        Order paidAgain = orderService.payOrder(1L, 100L);
+
+        assertThat(paidOrder.getPayStatus()).isEqualTo("PAID");
+        assertThat(paidOrder.getPayTime()).isNotNull();
+        assertThat(paidOrder.getShowName()).isEqualTo("支付测试演唱会");
+        assertThat(paidAgain.getPayStatus()).isEqualTo("PAID");
+        assertThat(paidAgain.getPayTime()).isEqualTo(paidOrder.getPayTime());
+    }
+
+    @Test
+    @DisplayName("should_取消待支付订单并释放座位")
+    void should_cancel_pending_order_and_release_seat() {
+        insertUser(100L, "alice");
+        insertShow(1L, "取消测试演唱会");
+        insertTicket(1L, 1L, "REGULAR", "看台", "A1", 280.00, 0, 1);
+        insertOrder(1L, "ORD1", 100L, 1L, 1L, "A1", "2026-05-03 10:00:00");
+
+        orderService.cancelOrder(1L, 100L);
+
+        Order order = orderMapper.selectById(1L);
+        Ticket ticket = ticketService.getById(1L);
+        assertThat(order.getPayStatus()).isEqualTo("CANCELLED");
+        assertThat(ticket.getStock()).isEqualTo(1);
+        assertThat(ticket.getSold()).isZero();
+    }
+
+    @Test
+    @DisplayName("should_按支付状态筛选用户订单")
+    void should_filter_user_orders_by_pay_status() {
+        insertUser(100L, "alice");
+        insertShow(1L, "筛选测试演唱会");
+        insertTicket(1L, 1L, "REGULAR", "看台", "A1", 280.00, 0, 1);
+        insertTicket(2L, 1L, "REGULAR", "看台", "A2", 280.00, 0, 1);
+        insertOrder(1L, "ORD1", 100L, 1L, 1L, "A1", "2026-05-03 10:00:00");
+        insertOrder(2L, "ORD2", 100L, 1L, 2L, "A2", "2026-05-03 11:00:00");
+        jdbcTemplate.update("UPDATE orders SET pay_status = 'PAID' WHERE id = 2");
+
+        List<Order> orders = orderService.getUserOrders(100L, "PAID");
+
+        assertThat(orders).hasSize(1);
+        assertThat(orders.get(0).getOrderNo()).isEqualTo("ORD2");
+        assertThat(orders.get(0).getShowName()).isEqualTo("筛选测试演唱会");
+    }
+
+    @Test
+    @DisplayName("should_审核通过或驳回待支付订单")
+    void should_audit_pending_orders_with_approve_or_reject() {
+        insertUser(100L, "alice");
+        insertShow(1L, "审核测试演唱会");
+        insertTicket(1L, 1L, "REGULAR", "看台", "A1", 280.00, 0, 1);
+        insertTicket(2L, 1L, "REGULAR", "看台", "A2", 280.00, 0, 1);
+        insertOrder(1L, "ORD1", 100L, 1L, 1L, "A1", "2026-05-03 10:00:00");
+        insertOrder(2L, "ORD2", 100L, 1L, 2L, "A2", "2026-05-03 11:00:00");
+
+        Order approvedOrder = orderService.auditOrder(1L, "APPROVE");
+        Order rejectedOrder = orderService.auditOrder(2L, "REJECT");
+
+        Ticket rejectedTicket = ticketService.getById(2L);
+        assertThat(approvedOrder.getPayStatus()).isEqualTo("PAID");
+        assertThat(approvedOrder.getPayTime()).isNotNull();
+        assertThat(rejectedOrder.getPayStatus()).isEqualTo("REJECTED");
+        assertThat(rejectedTicket.getStock()).isEqualTo(1);
+        assertThat(rejectedTicket.getSold()).isZero();
+    }
+
+    @Test
+    @DisplayName("should_分页查询全部订单并按状态筛选")
+    void should_page_all_orders_and_filter_by_pay_status() {
+        insertUser(100L, "alice");
+        insertUser(101L, "bob");
+        insertShow(1L, "后台列表演唱会");
+        insertTicket(1L, 1L, "REGULAR", "看台", "A1", 280.00, 0, 1);
+        insertTicket(2L, 1L, "REGULAR", "看台", "A2", 280.00, 0, 1);
+        insertOrder(1L, "ORD1", 100L, 1L, 1L, "A1", "2026-05-03 10:00:00");
+        insertOrder(2L, "ORD2", 101L, 1L, 2L, "A2", "2026-05-03 11:00:00");
+        jdbcTemplate.update("UPDATE orders SET pay_status = 'PAID' WHERE id = 2");
+
+        IPage<Order> orderPage = orderService.getAllOrders(1, 10, "PAID");
+
+        assertThat(orderPage.getTotal()).isEqualTo(1);
+        assertThat(orderPage.getRecords()).hasSize(1);
+        assertThat(orderPage.getRecords().get(0).getOrderNo()).isEqualTo("ORD2");
+        assertThat(orderPage.getRecords().get(0).getShowName()).isEqualTo("后台列表演唱会");
+    }
+
+    @Test
+    @DisplayName("should_超时取消待支付订单并释放座位")
+    void should_cancel_expired_pending_orders_and_release_seats() {
+        insertUser(100L, "alice");
+        insertShow(1L, "超时测试演唱会");
+        insertTicket(1L, 1L, "REGULAR", "看台", "A1", 280.00, 0, 1);
+        insertOrder(1L, "ORD1", 100L, 1L, 1L, "A1", "2026-05-03 10:00:00");
+        jdbcTemplate.update("UPDATE orders SET expire_time = ? WHERE id = ?", LocalDateTime.now().minusMinutes(1), 1L);
+
+        orderTimeoutService.cancelExpiredOrders();
+
+        Order order = orderMapper.selectById(1L);
+        Ticket ticket = ticketService.getById(1L);
+        assertThat(order.getPayStatus()).isEqualTo("CANCELLED");
+        assertThat(ticket.getStock()).isEqualTo(1);
+        assertThat(ticket.getSold()).isZero();
     }
 
     private OrderCreateRequest createRequest(Long showId, Long ticketId) {
