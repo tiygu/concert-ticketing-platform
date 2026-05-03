@@ -1,0 +1,23 @@
+spring:
+  profiles:
+    active: dev
+
+server:
+  port: 8080
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: isDeleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+app:
+  jwt:
+    secret: concert-ticketing-jwt-secret-key-2026
+    expiration: 7200
+    refresh-expiration: 604800
