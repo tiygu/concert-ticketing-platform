@@ -114,7 +114,14 @@ CREATE TABLE IF NOT EXISTS reviews (
     content         TEXT            DEFAULT NULL,
     rating          TINYINT         DEFAULT NULL,
     created_at      TIMESTAMP       NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (order_id) REFERENCES orders(id),
-    FOREIGN KEY (user_id)  REFERENCES users(id),
-    FOREIGN KEY (show_id)  REFERENCES shows(id)
+     FOREIGN KEY (order_id) REFERENCES orders(id),
+     FOREIGN KEY (user_id)  REFERENCES users(id),
+     FOREIGN KEY (show_id)  REFERENCES shows(id)
 );
+
+-- 初始化：插入默认管理员账号 (密码: admin123, BCrypt加密)
+-- 使用 WHERE NOT EXISTS 保证幂等，避免重复执行时唯一索引冲突
+INSERT INTO users (username, password, role, vip_level, points, status)
+SELECT 'admin', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi',
+       'ADMIN', 0, 0, 'ACTIVE'
+WHERE NOT EXISTS (SELECT 1 FROM users WHERE username = 'admin');
