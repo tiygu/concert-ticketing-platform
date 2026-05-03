@@ -63,24 +63,50 @@
                     取消订单
                   </el-button>
                 </template>
-                <el-button v-else-if="order.payStatus === 'PAID'" type="success" text size="small" @click.stop="handleComplete">
-                  确认完成
+                <el-button v-else-if="order.payStatus === 'COMPLETED'" type="warning" text size="small" @click.stop="openReviewDialog(order)">
+                  去评价
                 </el-button>
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      <el-dialog v-model="reviewVisible" title="评价演出" width="480px" :close-on-click-modal="false" custom-class="review-dialog">
+        <div class="review-form">
+          <p class="review-order-info">订单: {{ selectedOrder?.orderNo }}</p>
+          <p class="review-show-info">演出: {{ selectedOrder?.showName }}</p>
+          <div class="rating-row">
+            <span>评分：</span>
+            <el-rate v-model="reviewRating" :max="5" show-score />
+          </div>
+          <el-input
+            v-model="reviewContent"
+            type="textarea"
+            :rows="4"
+            maxlength="500"
+            show-word-limit
+            placeholder="分享你的观演体验（1-500字）"
+          />
+        </div>
+        <template #footer>
+          <el-button @click="reviewVisible = false">取消</el-button>
+          <el-button type="primary" :loading="submittingReview" :disabled="!canSubmitReview" @click="submitReview">
+            提交评价
+          </el-button>
+        </template>
+      </el-dialog>
     </main>
   </el-config-provider>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getUserOrders, payOrder, cancelOrder, type OrderItem } from '../api/orders'
+import { createReview } from '../api/reviews'
 
 const router = useRouter()
 const orders = ref<OrderItem[]>([])
@@ -88,6 +114,14 @@ const loading = ref(false)
 const activeStatus = ref('')
 const payingId = ref<number | null>(null)
 const cancellingId = ref<number | null>(null)
+
+const reviewVisible = ref(false)
+const selectedOrder = ref<OrderItem | null>(null)
+const reviewRating = ref(0)
+const reviewContent = ref('')
+const submittingReview = ref(false)
+
+const canSubmitReview = computed(() => reviewRating.value >= 1 && reviewContent.value.trim().length > 0)
 
 const statusTabs = [
   { key: '', label: '全部' },
@@ -177,8 +211,32 @@ async function handleCancel(id: number) {
   }
 }
 
-function handleComplete() {
-  ElMessage.info('功能开发中，敬请期待')
+function openReviewDialog(order: OrderItem) {
+  selectedOrder.value = order
+  reviewRating.value = 0
+  reviewContent.value = ''
+  reviewVisible.value = true
+}
+
+async function submitReview() {
+  if (!selectedOrder.value) return
+  submittingReview.value = true
+  try {
+    await createReview({
+      orderId: selectedOrder.value.id,
+      showId: selectedOrder.value.showId,
+      rating: reviewRating.value,
+      content: reviewContent.value.trim()
+    })
+    ElMessage.success('评价成功')
+    reviewVisible.value = false
+    await fetchOrders()
+  } catch (e: any) {
+    const msg = e?.response?.data?.message || '评价失败'
+    ElMessage.error(msg)
+  } finally {
+    submittingReview.value = false
+  }
 }
 
 function goDetail(id: number) {
@@ -272,6 +330,40 @@ onMounted(fetchOrders)
 .order-card-footer {
   display: flex; align-items: center; justify-content: flex-end; gap: 10px;
   margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.review-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.review-order-info,
+.review-show-info {
+  color: rgba(238, 238, 238, 0.7);
+  margin: 0;
+  font-size: 14px;
+}
+
+.rating-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #eee;
+}
+
+:deep(.review-dialog) {
+  background: #16213e;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+}
+
+:deep(.review-dialog .el-dialog__title) {
+  color: #fff;
+}
+
+:deep(.review-dialog .el-dialog__body) {
+  color: #eee;
 }
 
 @media (max-width: 560px) {

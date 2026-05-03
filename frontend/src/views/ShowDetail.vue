@@ -69,6 +69,26 @@
             </div>
           </section>
 
+          <section class="content-section">
+            <h2>观众评价</h2>
+            <div v-if="reviews.length === 0" class="empty-zone">暂无评价</div>
+            <div v-else class="review-list">
+              <div class="review-summary">
+                <span class="avg-rating">{{ averageRating.toFixed(1) }}</span>
+                <el-rate v-model="averageRating" disabled show-score text-color="#ffd700" />
+                <span class="review-count">{{ reviews.length }} 条评价</span>
+              </div>
+              <div v-for="review in reviews" :key="review.id" class="review-card">
+                <div class="review-header">
+                  <span class="review-author">{{ review.username }}</span>
+                  <el-rate v-model="review.rating" disabled size="small" />
+                  <span class="review-time">{{ formatReviewTime(review.createdAt) }}</span>
+                </div>
+                <p class="review-content">{{ review.content }}</p>
+              </div>
+            </div>
+          </section>
+
           <el-button class="back-button" size="large" @click="goHome">返回首页</el-button>
         </section>
       </article>
@@ -83,6 +103,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import zhCn from 'element-plus/es/locale/lang/zh-cn'
 import { getShow, type ShowItem } from '../api/shows'
 import { getShowSeats, createOrder, type SeatItem } from '../api/orders'
+import { getShowReviews, type ReviewItem } from '../api/reviews'
 
 const route = useRoute()
 const router = useRouter()
@@ -95,6 +116,9 @@ const error = ref(false)
 const seats = ref<SeatItem[]>([])
 const selectedSeatId = ref<number | null>(null)
 const ordering = ref(false)
+
+const reviews = ref<ReviewItem[]>([])
+const averageRating = computed(() => reviews.value.length ? reviews.value.reduce((s, r) => s + r.rating, 0) / reviews.value.length : 0)
 
 const selectedSeat = computed(() => seats.value.find(s => s.id === selectedSeatId.value))
 
@@ -165,6 +189,19 @@ function formatPrice(value: number) {
   return `¥${Number(value || 0).toFixed(2)}`
 }
 
+function formatReviewTime(value: string) {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleDateString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).replace(/\//g, '-')
+}
+
 async function fetchShow() {
   const id = Number(route.params.id)
   if (!Number.isFinite(id)) {
@@ -178,11 +215,21 @@ async function fetchShow() {
     const response = await getShow(id)
     show.value = response.data.data
     await fetchSeats(id)
+    await fetchReviews(id)
   } catch {
     show.value = null
     error.value = true
   } finally {
     loading.value = false
+  }
+}
+
+async function fetchReviews(showId: number) {
+  try {
+    const res = await getShowReviews(showId)
+    reviews.value = res.data.data || []
+  } catch {
+    reviews.value = []
   }
 }
 
@@ -439,6 +486,65 @@ h1 {
   background: rgba(0, 0, 0, 0.24);
   color: #eee;
   font-size: 15px;
+}
+
+.review-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.review-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  border: 1px solid rgba(255, 215, 0, 0.3);
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.24);
+}
+
+.avg-rating {
+  font-size: 32px;
+  font-weight: 900;
+  color: #ffd700;
+}
+
+.review-count {
+  color: rgba(238, 238, 238, 0.6);
+  font-size: 14px;
+  margin-left: auto;
+}
+
+.review-card {
+  padding: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.review-header {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.review-author {
+  font-weight: 700;
+  color: #eee;
+}
+
+.review-time {
+  color: rgba(238, 238, 238, 0.5);
+  font-size: 12px;
+  margin-left: auto;
+}
+
+.review-content {
+  color: rgba(238, 238, 238, 0.8);
+  margin: 10px 0 0;
+  line-height: 1.6;
+  white-space: pre-wrap;
 }
 
 .back-button {

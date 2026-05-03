@@ -119,6 +119,8 @@ CREATE TABLE IF NOT EXISTS reviews (
      FOREIGN KEY (show_id)  REFERENCES shows(id)
 );
 
+ALTER TABLE reviews ADD CONSTRAINT IF NOT EXISTS uk_reviews_order_id UNIQUE (order_id);
+
 -- 初始化：插入默认管理员账号 (密码: admin123, BCrypt加密)
 -- 使用 WHERE NOT EXISTS 保证幂等，避免重复执行时唯一索引冲突
 INSERT INTO users (username, password, role, vip_level, points, status)
