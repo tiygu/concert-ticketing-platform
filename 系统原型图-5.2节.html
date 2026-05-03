@@ -1,0 +1,1413 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>大型演唱会票务预订与VIP服务平台 - 系统原型图</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+    <style>
+        :root {
+            --neon-pink: #ff006e;
+            --neon-purple: #8338ec;
+            --neon-blue: #3a86ff;
+            --neon-cyan: #00f5ff;
+            --dark-bg: #0a0a0f;
+            --card-bg: #12121a;
+        }
+        
+        body {
+            font-family: 'Noto Sans SC', sans-serif;
+            background: linear-gradient(135deg, #0a0a0f 0%, #1a0a2e 50%, #0f0f23 100%);
+            min-height: 100vh;
+            color: #fff;
+            overflow-x: hidden;
+        }
+        
+        .title-font {
+            font-family: 'Orbitron', sans-serif;
+        }
+        
+        .neon-glow {
+            text-shadow: 0 0 10px var(--neon-cyan), 0 0 20px var(--neon-cyan), 0 0 40px var(--neon-cyan);
+        }
+        
+        .neon-border {
+            box-shadow: 0 0 10px var(--neon-purple), inset 0 0 10px rgba(131, 56, 236, 0.2);
+        }
+        
+        .glass-card {
+            background: rgba(18, 18, 26, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .function-card {
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .function-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 40px rgba(131, 56, 236, 0.3);
+            border-color: var(--neon-purple);
+        }
+        
+        .seat {
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+        
+        .seat:hover:not(.occupied) {
+            transform: scale(1.2);
+            box-shadow: 0 0 15px var(--neon-cyan);
+        }
+        
+        .seat.selected {
+            background: linear-gradient(135deg, var(--neon-pink), var(--neon-purple));
+            box-shadow: 0 0 20px var(--neon-pink);
+        }
+        
+        .seat.occupied {
+            background: #333;
+            cursor: not-allowed;
+        }
+        
+        .stage-glow {
+            background: linear-gradient(180deg, rgba(255,0,110,0.3) 0%, transparent 100%);
+            animation: stagePulse 3s ease-in-out infinite;
+        }
+        
+        @keyframes stagePulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+        
+        .particle {
+            position: absolute;
+            width: 4px;
+            height: 4px;
+            background: var(--neon-cyan);
+            border-radius: 50%;
+            animation: float 10s infinite linear;
+            opacity: 0.6;
+        }
+        
+        @keyframes float {
+            0% { transform: translateY(100vh) rotate(0deg); opacity: 0; }
+            10% { opacity: 0.6; }
+            90% { opacity: 0.6; }
+            100% { transform: translateY(-100vh) rotate(720deg); opacity: 0; }
+        }
+        
+        .nav-tab {
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        
+        .nav-tab.active::after {
+            content: '';
+            position: absolute;
+            bottom: -2px;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--neon-pink), var(--neon-purple));
+            box-shadow: 0 0 10px var(--neon-pink);
+        }
+        
+        .progress-bar {
+            background: linear-gradient(90deg, var(--neon-pink), var(--neon-purple), var(--neon-blue));
+            background-size: 200% 100%;
+            animation: gradientFlow 2s linear infinite;
+        }
+        
+        @keyframes gradientFlow {
+            0% { background-position: 0% 50%; }
+            100% { background-position: 200% 50%; }
+        }
+        
+        .vip-badge {
+            background: linear-gradient(135deg, #ffd700, #ffed4e);
+            color: #000;
+            font-weight: bold;
+        }
+        
+        .stat-card {
+            background: linear-gradient(135deg, rgba(131, 56, 236, 0.2), rgba(58, 134, 255, 0.2));
+            border: 1px solid rgba(131, 56, 236, 0.3);
+        }
+        
+        /* Scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        ::-webkit-scrollbar-track {
+            background: var(--dark-bg);
+        }
+        
+        ::-webkit-scrollbar-thumb {
+            background: var(--neon-purple);
+            border-radius: 4px;
+        }
+        
+        .module-section {
+            display: none;
+        }
+        
+        .module-section.active {
+            display: block;
+            animation: fadeIn 0.5s ease;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .code-block {
+            background: #1e1e2e;
+            border-left: 3px solid var(--neon-purple);
+            font-family: 'Consolas', 'Monaco', monospace;
+        }
+    </style>
+</head>
+<body class="antialiased">
+    <!-- Background particles -->
+    <div id="particles" class="fixed inset-0 pointer-events-none z-0"></div>
+    
+    <!-- Header -->
+    <header class="relative z-10 glass-card border-b border-white/10 sticky top-0">
+        <div class="container mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center">
+                        <i class="fas fa-ticket-alt text-white text-xl"></i>
+                    </div>
+                    <div>
+                        <h1 class="title-font text-2xl font-bold neon-glow">STAR TICKET</h1>
+                        <p class="text-xs text-gray-400">大型演唱会票务预订与VIP服务平台</p>
+                    </div>
+                </div>
+                <div class="flex items-center gap-6">
+                    <div class="text-right">
+                        <p class="text-sm text-gray-400">5.2 系统主要功能实现</p>
+                        <p class="text-xs text-purple-400">系统原型展示</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Navigation -->
+    <nav class="relative z-10 bg-black/30 border-b border-white/5">
+        <div class="container mx-auto px-6">
+            <div class="flex gap-1 overflow-x-auto">
+                <button onclick="showModule('seat-booking')" class="nav-tab active px-6 py-4 text-sm font-medium hover:text-cyan-400 transition-colors whitespace-nowrap" data-module="seat-booking">
+                    <i class="fas fa-chair mr-2"></i>5.2.1 选座购票
+                </button>
+                <button onclick="showModule('order-management')" class="nav-tab px-6 py-4 text-sm font-medium hover:text-cyan-400 transition-colors whitespace-nowrap" data-module="order-management">
+                    <i class="fas fa-shopping-cart mr-2"></i>5.2.2 订单管理
+                </button>
+                <button onclick="showModule('vip-benefits')" class="nav-tab px-6 py-4 text-sm font-medium hover:text-cyan-400 transition-colors whitespace-nowrap" data-module="vip-benefits">
+                    <i class="fas fa-crown mr-2"></i>5.2.3 VIP权益预约
+                </button>
+                <button onclick="showModule('user-management')" class="nav-tab px-6 py-4 text-sm font-medium hover:text-cyan-400 transition-colors whitespace-nowrap" data-module="user-management">
+                    <i class="fas fa-users mr-2"></i>5.2.4 用户管理
+                </button>
+                <button onclick="showModule('announcement')" class="nav-tab px-6 py-4 text-sm font-medium hover:text-cyan-400 transition-colors whitespace-nowrap" data-module="announcement">
+                    <i class="fas fa-bullhorn mr-2"></i>5.2.5 演出公告管理
+                </button>
+                <button onclick="showModule('statistics')" class="nav-tab px-6 py-4 text-sm font-medium hover:text-cyan-400 transition-colors whitespace-nowrap" data-module="statistics">
+                    <i class="fas fa-chart-bar mr-2"></i>5.2.6 数据统计管理
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="relative z-10 container mx-auto px-6 py-8">
+        
+        <!-- 5.2.1 选座购票功能实现 -->
+        <section id="seat-booking" class="module-section active">
+            <div class="mb-6">
+                <h2 class="text-3xl font-bold mb-2 flex items-center gap-3">
+                    <span class="w-10 h-10 rounded-lg bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center text-lg">1</span>
+                    选座购票功能实现
+                </h2>
+                <p class="text-gray-400">用户浏览演出信息，查看座位分布图，选择心仪座位完成购票</p>
+            </div>
+
+            <!-- Concert Info -->
+            <div class="glass-card rounded-2xl p-6 mb-6">
+                <div class="flex gap-6">
+                    <div class="w-48 h-64 rounded-xl bg-gradient-to-br from-purple-600 to-pink-500 flex items-center justify-center flex-shrink-0">
+                        <div class="text-center">
+                            <i class="fas fa-music text-6xl mb-2"></i>
+                            <p class="font-bold">演唱会海报</p>
+                        </div>
+                    </div>
+                    <div class="flex-1">
+                        <div class="flex justify-between items-start mb-4">
+                            <div>
+                                <span class="px-3 py-1 rounded-full bg-pink-500/20 text-pink-400 text-sm mb-2 inline-block">热门演出</span>
+                                <h3 class="text-2xl font-bold mb-2">2026星空音乐节 - 巨星演唱会</h3>
+                                <p class="text-gray-400"><i class="far fa-calendar mr-2"></i>2026年6月15日 19:30</p>
+                                <p class="text-gray-400"><i class="fas fa-map-marker-alt mr-2"></i>北京国家体育场（鸟巢）</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-sm text-gray-400">票价范围</p>
+                                <p class="text-3xl font-bold text-cyan-400">¥280-1680</p>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-4 gap-4 mt-4">
+                            <div class="p-3 rounded-lg bg-white/5 text-center">
+                                <p class="text-xs text-gray-400">VIP区</p>
+                                <p class="text-lg font-bold text-yellow-400">¥1680</p>
+                                <p class="text-xs text-green-400">剩余 45 张</p>
+                            </div>
+                            <div class="p-3 rounded-lg bg-white/5 text-center">
+                                <p class="text-xs text-gray-400">A区</p>
+                                <p class="text-lg font-bold text-purple-400">¥980</p>
+                                <p class="text-xs text-green-400">剩余 128 张</p>
+                            </div>
+                            <div class="p-3 rounded-lg bg-white/5 text-center">
+                                <p class="text-xs text-gray-400">B区</p>
+                                <p class="text-lg font-bold text-blue-400">¥680</p>
+                                <p class="text-xs text-yellow-400">剩余 86 张</p>
+                            </div>
+                            <div class="p-3 rounded-lg bg-white/5 text-center">
+                                <p class="text-xs text-gray-400">C区</p>
+                                <p class="text-lg font-bold text-cyan-400">¥280</p>
+                                <p class="text-xs text-red-400">剩余 12 张</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Seat Selection -->
+            <div class="grid grid-cols-3 gap-6">
+                <!-- Seat Map -->
+                <div class="col-span-2 glass-card rounded-2xl p-6">
+                    <h3 class="text-xl font-bold mb-4 flex items-center gap-2">
+                        <i class="fas fa-th text-purple-400"></i>在线选座
+                    </h3>
+                    <!-- Stage -->
+                    <div class="stage-glow rounded-t-3xl p-4 mb-8 text-center">
+                        <div class="w-full h-16 bg-gradient-to-b from-purple-500/30 to-transparent rounded-t-2xl flex items-center justify-center border-t-2 border-purple-400/50">
+                            <span class="text-lg font-bold tracking-widest">舞台 STAGE</span>
+                        </div>
+                    </div>
+                    <!-- Seats -->
+                    <div id="seat-map" class="space-y-2 mb-6">
+                        <!-- Generated by JS -->
+                    </div>
+                    <!-- Legend -->
+                    <div class="flex justify-center gap-6 text-sm">
+                        <div class="flex items-center gap-2">
+                            <div class="w-6 h-6 rounded bg-gray-600"></div>
+                            <span>已售出</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-6 h-6 rounded bg-cyan-400"></div>
+                            <span>可选</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-6 h-6 rounded bg-gradient-to-br from-pink-500 to-purple-600"></div>
+                            <span>已选</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Order Summary -->
+                <div class="glass-card rounded-2xl p-6">
+                    <h3 class="text-xl font-bold mb-4">订单信息</h3>
+                    <div id="selected-seats" class="space-y-2 mb-4 max-h-48 overflow-y-auto">
+                        <p class="text-gray-400 text-sm">请选择座位</p>
+                    </div>
+                    <div class="border-t border-white/10 pt-4 mb-4">
+                        <div class="flex justify-between mb-2">
+                            <span class="text-gray-400">座位数量</span>
+                            <span id="seat-count" class="font-bold">0</span>
+                        </div>
+                        <div class="flex justify-between text-xl">
+                            <span>总计</span>
+                            <span id="total-price" class="font-bold text-cyan-400">¥0</span>
+                        </div>
+                    </div>
+                    <button onclick="createOrder()" id="submit-order" class="w-full py-3 rounded-xl bg-gradient-to-r from-pink-500 to-purple-600 font-bold hover:shadow-lg hover:shadow-purple-500/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                        提交订单
+                    </button>
+                    <p class="text-xs text-gray-500 mt-3 text-center">请在15分钟内完成支付，超时将释放座位</p>
+                    
+                    <!-- Core Code Display -->
+                    <div class="mt-6 p-3 rounded-lg bg-black/30 text-xs">
+                        <p class="text-purple-400 font-bold mb-2"><i class="fas fa-code mr-1"></i>核心实现代码</p>
+                        <div class="code-block p-2 rounded text-xs overflow-x-auto">
+                            <span class="text-purple-400">@PostMapping</span>("/create")<br>
+                            <span class="text-blue-400">public</span> Result createOrder(<br>
+                            &nbsp;&nbsp;@RequestBody OrderDTO dto) {<br>
+                            &nbsp;&nbsp;<span class="text-green-400">return</span> orderService.createOrder(dto);<br>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 5.2.2 订单管理功能实现 -->
+        <section id="order-management" class="module-section">
+            <div class="mb-6">
+                <h2 class="text-3xl font-bold mb-2 flex items-center gap-3">
+                    <span class="w-10 h-10 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-lg">2</span>
+                    订单管理功能实现
+                </h2>
+                <p class="text-gray-400">订单全生命周期管理，包括订单查看、支付确认、取消订单等功能</p>
+            </div>
+
+            <div class="grid grid-cols-4 gap-4 mb-6">
+                <div class="stat-card rounded-xl p-4">
+                    <p class="text-gray-400 text-sm">全部订单</p>
+                    <p class="text-3xl font-bold">12</p>
+                </div>
+                <div class="stat-card rounded-xl p-4">
+                    <p class="text-gray-400 text-sm">待支付</p>
+                    <p class="text-3xl font-bold text-yellow-400">2</p>
+                </div>
+                <div class="stat-card rounded-xl p-4">
+                    <p class="text-gray-400 text-sm">已支付</p>
+                    <p class="text-3xl font-bold text-green-400">9</p>
+                </div>
+                <div class="stat-card rounded-xl p-4">
+                    <p class="text-gray-400 text-sm">已取消</p>
+                    <p class="text-3xl font-bold text-gray-400">1</p>
+                </div>
+            </div>
+
+            <div class="glass-card rounded-2xl overflow-hidden">
+                <div class="p-4 border-b border-white/10 flex justify-between items-center">
+                    <h3 class="text-xl font-bold">我的订单</h3>
+                    <div class="flex gap-2">
+                        <button class="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-sm transition-colors">全部</button>
+                        <button class="px-4 py-2 rounded-lg bg-yellow-500/20 text-yellow-400 text-sm">待支付</button>
+                        <button class="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 text-sm transition-colors">已完成</button>
+                    </div>
+                </div>
+                <div class="divide-y divide-white/5">
+                    <!-- Order Item 1 - Pending Payment -->
+                    <div class="p-6 flex items-center justify-between hover:bg-white/5 transition-colors">
+                        <div class="flex items-center gap-4">
+                            <div class="w-20 h-20 rounded-lg bg-gradient-to-br from-purple-600 to-pink-500 flex items-center justify-center">
+                                <i class="fas fa-music text-3xl"></i>
+                            </div>
+                            <div>
+                                <span class="px-2 py-1 rounded bg-yellow-500/20 text-yellow-400 text-xs mb-2 inline-block">待支付</span>
+                                <h4 class="font-bold text-lg">2026星空音乐节 - 巨星演唱会</h4>
+                                <p class="text-sm text-gray-400">2026年6月15日 19:30 | 北京国家体育场</p>
+                                <p class="text-sm text-cyan-400 mt-1">座位: A区 12排 8号, A区 12排 9号</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-2xl font-bold text-cyan-400">¥1960</p>
+                            <p class="text-sm text-red-400 mb-3">剩余 14:32</p>
+                            <div class="flex gap-2">
+                                <button onclick="payOrder(this)" class="px-4 py-2 rounded-lg bg-gradient-to-r from-pink-500 to-purple-600 text-sm font-bold hover:shadow-lg transition-all">
+                                    立即支付
+                                </button>
+                                <button class="px-4 py-2 rounded-lg border border-white/20 text-sm hover:bg-white/10 transition-colors">
+                                    取消订单
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Order Item 2 - Paid -->
+                    <div class="p-6 flex items-center justify-between hover:bg-white/5 transition-colors">
+                        <div class="flex items-center gap-4">
+                            <div class="w-20 h-20 rounded-lg bg-gradient-to-br from-blue-600 to-cyan-500 flex items-center justify-center">
+                                <i class="fas fa-guitar text-3xl"></i>
+                            </div>
+                            <div>
+                                <span class="px-2 py-1 rounded bg-green-500/20 text-green-400 text-xs mb-2 inline-block">已支付</span>
+                                <h4 class="font-bold text-lg">周杰伦嘉年华世界巡回演唱会</h4>
+                                <p class="text-sm text-gray-400">2026年5月20日 19:30 | 上海体育场</p>
+                                <p class="text-sm text-cyan-400 mt-1">座位: VIP区 3排 15号</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-2xl font-bold text-cyan-400">¥1680</p>
+                            <p class="text-sm text-gray-400 mb-3">2026-05-01 10:23 支付</p>
+                            <div class="flex gap-2 justify-end">
+                                <button class="px-4 py-2 rounded-lg bg-white/10 text-sm hover:bg-white/20 transition-colors">
+                                    查看详情
+                                </button>
+                                <button class="px-4 py-2 rounded-lg border border-cyan-500/50 text-cyan-400 text-sm hover:bg-cyan-500/10 transition-colors">
+                                    评价
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Order Item 3 -->
+                    <div class="p-6 flex items-center justify-between hover:bg-white/5 transition-colors">
+                        <div class="flex items-center gap-4">
+                            <div class="w-20 h-20 rounded-lg bg-gradient-to-br from-pink-500 to-orange-500 flex items-center justify-center">
+                                <i class="fas fa-drum text-3xl"></i>
+                            </div>
+                            <div>
+                                <span class="px-2 py-1 rounded bg-green-500/20 text-green-400 text-xs mb-2 inline-block">已完成</span>
+                                <h4 class="font-bold text-lg">五月天好好好想见到你演唱会</h4>
+                                <p class="text-sm text-gray-400">2026年4月15日 19:00 | 广州体育馆</p>
+                                <p class="text-sm text-cyan-400 mt-1">座位: B区 8排 22号</p>
+                            </div>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-2xl font-bold text-cyan-400">¥680</p>
+                            <p class="text-sm text-gray-400 mb-3">已完成</p>
+                            <button class="px-4 py-2 rounded-lg bg-white/10 text-sm hover:bg-white/20 transition-colors">
+                                查看票根
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Payment Modal Simulation -->
+            <div class="mt-6 glass-card rounded-2xl p-6">
+                <h3 class="text-lg font-bold mb-4">订单支付流程</h3>
+                <div class="flex items-center gap-4">
+                    <div class="flex-1 h-2 bg-white/10 rounded-full overflow-hidden">
+                        <div id="payment-progress" class="progress-bar h-full w-0 rounded-full transition-all duration-1000"></div>
+                    </div>
+                    <button onclick="simulatePayment()" class="px-6 py-2 rounded-lg bg-gradient-to-r from-cyan-500 to-blue-600 font-bold hover:shadow-lg transition-all">
+                        模拟支付流程
+                    </button>
+                </div>
+                <div id="payment-status" class="mt-4 p-3 rounded-lg bg-black/30 text-sm hidden">
+                    <p class="text-green-400"><i class="fas fa-check-circle mr-2"></i>支付成功！订单状态已更新为"已支付"</p>
+                </div>
+                
+                <!-- Core Code -->
+                <div class="mt-4 p-3 rounded-lg bg-black/30 text-xs">
+                    <p class="text-purple-400 font-bold mb-2"><i class="fas fa-code mr-1"></i>核心实现代码</p>
+                    <div class="code-block p-2 rounded text-xs overflow-x-auto">
+                        <span class="text-purple-400">@PostMapping</span>("/pay")<br>
+                        <span class="text-blue-400">public</span> Result payOrder(@RequestBody PaymentDTO dto) {<br>
+                        &nbsp;&nbsp;Order order = orderService.getById(dto.getOrderId());<br>
+                        &nbsp;&nbsp;order.setPayStatus(<span class="text-yellow-400">"已支付"</span>);<br>
+                        &nbsp;&nbsp;order.setPayTime(LocalDateTime.now());<br>
+                        &nbsp;&nbsp;orderService.updateById(order);<br>
+                        &nbsp;&nbsp;<span class="text-green-400">return</span> Result.ok(<span class="text-yellow-400">"支付成功"</span>);<br>
+                        }
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 5.2.3 VIP权益预约功能实现 -->
+        <section id="vip-benefits" class="module-section">
+            <div class="mb-6">
+                <h2 class="text-3xl font-bold mb-2 flex items-center gap-3">
+                    <span class="w-10 h-10 rounded-lg bg-gradient-to-br from-yellow-500 to-orange-600 flex items-center justify-center text-lg">3</span>
+                    VIP权益预约功能实现
+                </h2>
+                <p class="text-gray-400">VIP用户专属权益套餐浏览、预约申请、管理员审核等全流程管理</p>
+            </div>
+
+            <!-- VIP Header -->
+            <div class="glass-card rounded-2xl p-6 mb-6 bg-gradient-to-r from-yellow-500/10 to-orange-500/10 border-yellow-500/30">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-4">
+                        <div class="w-16 h-16 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center">
+                            <i class="fas fa-crown text-3xl text-black"></i>
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-2 mb-1">
+                                <span class="vip-badge px-2 py-1 rounded text-xs">VIP</span>
+                                <span class="text-lg font-bold">张三</span>
+                            </div>
+                            <p class="text-gray-400 text-sm">VIP等级: <span class="text-yellow-400 font-bold">黄金会员</span></p>
+                            <p class="text-gray-400 text-sm">积分余额: <span class="text-cyan-400 font-bold">2,580</span></p>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-sm text-gray-400">专属权益</p>
+                        <p class="text-3xl font-bold text-yellow-400">4项</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-3 gap-6 mb-6">
+                <!-- VIP Package 1 -->
+                <div class="function-card glass-card rounded-2xl p-6 border border-yellow-500/30">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center">
+                            <i class="fas fa-handshake text-xl text-black"></i>
+                        </div>
+                        <span class="px-2 py-1 rounded-full bg-green-500/20 text-green-400 text-xs">可预约</span>
+                    </div>
+                    <h3 class="text-xl font-bold mb-2">后台见面会</h3>
+                    <p class="text-sm text-gray-400 mb-4">演出结束后与艺人近距离互动，合影留念，获得签名海报</p>
+                    <div class="space-y-2 mb-4 text-sm">
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">所需等级</span>
+                            <span class="text-yellow-400">黄金会员</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">剩余名额</span>
+                            <span class="text-cyan-400">12/50</span>
+                        </div>
+                    </div>
+                    <button onclick="showBookingModal('后台见面会')" class="w-full py-2 rounded-lg bg-gradient-to-r from-yellow-500 to-orange-500 text-black font-bold hover:shadow-lg transition-all">
+                        立即预约
+                    </button>
+                </div>
+
+                <!-- VIP Package 2 -->
+                <div class="function-card glass-card rounded-2xl p-6 border border-yellow-500/30">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-400 to-pink-500 flex items-center justify-center">
+                            <i class="fas fa-door-open text-xl"></i>
+                        </div>
+                        <span class="px-2 py-1 rounded-full bg-green-500/20 text-green-400 text-xs">可预约</span>
+                    </div>
+                    <h3 class="text-xl font-bold mb-2">优先入场通道</h3>
+                    <p class="text-sm text-gray-400 mb-4">专属VIP快速入场通道，免排队，提前30分钟入场</p>
+                    <div class="space-y-2 mb-4 text-sm">
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">所需等级</span>
+                            <span class="text-yellow-400">白银会员</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">剩余名额</span>
+                            <span class="text-cyan-400">45/100</span>
+                        </div>
+                    </div>
+                    <button onclick="showBookingModal('优先入场通道')" class="w-full py-2 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 font-bold hover:shadow-lg transition-all">
+                        立即预约
+                    </button>
+                </div>
+
+                <!-- VIP Package 3 -->
+                <div class="function-card glass-card rounded-2xl p-6 border border-yellow-500/30">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center">
+                            <i class="fas fa-couch text-xl"></i>
+                        </div>
+                        <span class="px-2 py-1 rounded-full bg-red-500/20 text-red-400 text-xs">名额已满</span>
+                    </div>
+                    <h3 class="text-xl font-bold mb-2">VIP休息室</h3>
+                    <p class="text-sm text-gray-400 mb-4">演出前后使用VIP专属休息室，提供免费饮品和点心</p>
+                    <div class="space-y-2 mb-4 text-sm">
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">所需等级</span>
+                            <span class="text-yellow-400">铂金会员</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span class="text-gray-400">剩余名额</span>
+                            <span class="text-red-400">0/30</span>
+                        </div>
+                    </div>
+                    <button disabled class="w-full py-2 rounded-lg bg-gray-600 text-gray-400 font-bold cursor-not-allowed">
+                        已约满
+                    </button>
+                </div>
+            </div>
+
+            <!-- My Bookings -->
+            <div class="glass-card rounded-2xl overflow-hidden">
+                <div class="p-4 border-b border-white/10">
+                    <h3 class="text-xl font-bold">我的权益预约</h3>
+                </div>
+                <table class="w-full">
+                    <thead class="bg-white/5 text-sm">
+                        <tr>
+                            <th class="text-left p-4">权益名称</th>
+                            <th class="text-left p-4">使用日期</th>
+                            <th class="text-left p-4">预约时间</th>
+                            <th class="text-left p-4">审核状态</th>
+                            <th class="text-left p-4">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-sm divide-y divide-white/5">
+                        <tr class="hover:bg-white/5">
+                            <td class="p-4">后台见面会</td>
+                            <td class="p-4">2026-06-15</td>
+                            <td class="p-4">2026-05-01 14:30</td>
+                            <td class="p-4"><span class="px-2 py-1 rounded bg-yellow-500/20 text-yellow-400">待审核</span></td>
+                            <td class="p-4"><button class="text-cyan-400 hover:underline">取消预约</button></td>
+                        </tr>
+                        <tr class="hover:bg-white/5">
+                            <td class="p-4">优先入场通道</td>
+                            <td class="p-4">2026-05-20</td>
+                            <td class="p-4">2026-04-15 09:15</td>
+                            <td class="p-4"><span class="px-2 py-1 rounded bg-green-500/20 text-green-400">已通过</span></td>
+                            <td class="p-4"><button class="text-cyan-400 hover:underline">查看详情</button></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Core Code -->
+            <div class="mt-6 p-4 rounded-lg bg-black/30 text-xs">
+                <p class="text-purple-400 font-bold mb-2"><i class="fas fa-code mr-1"></i>核心实现代码</p>
+                <div class="code-block p-3 rounded text-xs overflow-x-auto">
+                    <span class="text-purple-400">@PostMapping</span>("/submit")<br>
+                    <span class="text-blue-400">public</span> Result submitBooking(@RequestBody VipBooking booking) {<br>
+                    &nbsp;&nbsp;booking.setAuditStatus(<span class="text-yellow-400">"待审核"</span>);<br>
+                    &nbsp;&nbsp;vipBookingService.save(booking);<br>
+                    &nbsp;&nbsp;<span class="text-green-400">return</span> Result.ok(<span class="text-yellow-400">"预约提交成功"</span>);<br>
+                    }
+                </div>
+            </div>
+
+            <!-- Booking Modal -->
+            <div id="booking-modal" class="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 hidden items-center justify-center">
+                <div class="glass-card rounded-2xl p-6 w-96">
+                    <h3 class="text-xl font-bold mb-4">预约权益</h3>
+                    <p class="text-gray-400 mb-4">权益: <span id="booking-package-name" class="text-cyan-400"></span></p>
+                    <div class="mb-4">
+                        <label class="block text-sm text-gray-400 mb-2">选择使用日期</label>
+                        <input type="date" class="w-full p-3 rounded-lg bg-white/5 border border-white/10 text-white" value="2026-06-15">
+                    </div>
+                    <div class="flex gap-3">
+                        <button onclick="closeBookingModal()" class="flex-1 py-2 rounded-lg border border-white/20 hover:bg-white/10 transition-colors">取消</button>
+                        <button onclick="submitBooking()" class="flex-1 py-2 rounded-lg bg-gradient-to-r from-yellow-500 to-orange-500 text-black font-bold">提交预约</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 5.2.4 用户管理功能实现 -->
+        <section id="user-management" class="module-section">
+            <div class="mb-6">
+                <h2 class="text-3xl font-bold mb-2 flex items-center gap-3">
+                    <span class="w-10 h-10 rounded-lg bg-gradient-to-br from-green-500 to-teal-600 flex items-center justify-center text-lg">4</span>
+                    用户管理功能实现
+                </h2>
+                <p class="text-gray-400">管理员对平台用户进行统一管理，包括查看用户列表、修改用户状态、删除违规用户</p>
+            </div>
+
+            <!-- Admin Stats -->
+            <div class="grid grid-cols-4 gap-4 mb-6">
+                <div class="stat-card rounded-xl p-4">
+                    <p class="text-gray-400 text-sm">总用户数</p>
+                    <p class="text-3xl font-bold">3,428</p>
+                </div>
+                <div class="stat-card rounded-xl p-4">
+                    <p class="text-gray-400 text-sm">普通用户</p>
+                    <p class="text-3xl font-bold text-blue-400">2,856</p>
+                </div>
+                <div class="stat-card rounded-xl p-4">
+                    <p class="text-gray-400 text-sm">VIP用户</p>
+                    <p class="text-3xl font-bold text-yellow-400">572</p>
+                </div>
+                <div class="stat-card rounded-xl p-4">
+                    <p class="text-gray-400 text-sm">今日新增</p>
+                    <p class="text-3xl font-bold text-green-400">+48</p>
+                </div>
+            </div>
+
+            <!-- User Table -->
+            <div class="glass-card rounded-2xl overflow-hidden">
+                <div class="p-4 border-b border-white/10 flex justify-between items-center">
+                    <h3 class="text-xl font-bold">用户列表</h3>
+                    <div class="flex gap-3">
+                        <input type="text" placeholder="搜索用户..." class="px-4 py-2 rounded-lg bg-white/5 border border-white/10 text-sm w-64">
+                        <button class="px-4 py-2 rounded-lg bg-gradient-to-r from-green-500 to-teal-600 text-sm font-bold">
+                            <i class="fas fa-search mr-2"></i>搜索
+                        </button>
+                    </div>
+                </div>
+                <table class="w-full">
+                    <thead class="bg-white/5 text-sm">
+                        <tr>
+                            <th class="text-left p-4">用户ID</th>
+                            <th class="text-left p-4">用户名</th>
+                            <th class="text-left p-4">角色</th>
+                            <th class="text-left p-4">VIP等级</th>
+                            <th class="text-left p-4">积分</th>
+                            <th class="text-left p-4">注册时间</th>
+                            <th class="text-left p-4">状态</th>
+                            <th class="text-left p-4">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-sm divide-y divide-white/5">
+                        <tr class="hover:bg-white/5">
+                            <td class="p-4">U1001</td>
+                            <td class="p-4 flex items-center gap-2">
+                                <div class="w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-xs">张</div>
+                                张三
+                            </td>
+                            <td class="p-4">普通用户</td>
+                            <td class="p-4"><span class="vip-badge px-2 py-1 rounded text-xs">黄金</span></td>
+                            <td class="p-4">2,580</td>
+                            <td class="p-4">2026-01-15</td>
+                            <td class="p-4"><span class="px-2 py-1 rounded bg-green-500/20 text-green-400">正常</span></td>
+                            <td class="p-4">
+                                <button class="text-cyan-400 hover:underline mr-3">编辑</button>
+                                <button class="text-red-400 hover:underline">禁用</button>
+                            </td>
+                        </tr>
+                        <tr class="hover:bg-white/5">
+                            <td class="p-4">U1002</td>
+                            <td class="p-4 flex items-center gap-2">
+                                <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center text-xs">李</div>
+                                李四
+                            </td>
+                            <td class="p-4">普通用户</td>
+                            <td class="p-4">-</td>
+                            <td class="p-4">320</td>
+                            <td class="p-4">2026-02-20</td>
+                            <td class="p-4"><span class="px-2 py-1 rounded bg-green-500/20 text-green-400">正常</span></td>
+                            <td class="p-4">
+                                <button class="text-cyan-400 hover:underline mr-3">编辑</button>
+                                <button class="text-red-400 hover:underline">禁用</button>
+                            </td>
+                        </tr>
+                        <tr class="hover:bg-white/5">
+                            <td class="p-4">U1003</td>
+                            <td class="p-4 flex items-center gap-2">
+                                <div class="w-8 h-8 rounded-full bg-gradient-to-br from-yellow-500 to-orange-500 flex items-center justify-center text-xs text-black">王</div>
+                                王五
+                            </td>
+                            <td class="p-4">普通用户</td>
+                            <td class="p-4"><span class="vip-badge px-2 py-1 rounded text-xs">白银</span></td>
+                            <td class="p-4">1,150</td>
+                            <td class="p-4">2026-03-01</td>
+                            <td class="p-4"><span class="px-2 py-1 rounded bg-red-500/20 text-red-400">已禁用</span></td>
+                            <td class="p-4">
+                                <button class="text-cyan-400 hover:underline mr-3">编辑</button>
+                                <button class="text-green-400 hover:underline">启用</button>
+                            </td>
+                        </tr>
+                        <tr class="hover:bg-white/5">
+                            <td class="p-4">U1004</td>
+                            <td class="p-4 flex items-center gap-2">
+                                <div class="w-8 h-8 rounded-full bg-gradient-to-br from-pink-500 to-purple-500 flex items-center justify-center text-xs">赵</div>
+                                赵六
+                            </td>
+                            <td class="p-4">VIP用户</td>
+                            <td class="p-4"><span class="vip-badge px-2 py-1 rounded text-xs">铂金</span></td>
+                            <td class="p-4">5,680</td>
+                            <td class="p-4">2025-12-10</td>
+                            <td class="p-4"><span class="px-2 py-1 rounded bg-green-500/20 text-green-400">正常</span></td>
+                            <td class="p-4">
+                                <button class="text-cyan-400 hover:underline mr-3">编辑</button>
+                                <button class="text-red-400 hover:underline">禁用</button>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="p-4 border-t border-white/10 flex justify-between items-center">
+                    <p class="text-sm text-gray-400">显示 1-4 共 3,428 条</p>
+                    <div class="flex gap-2">
+                        <button class="px-3 py-1 rounded border border-white/20 hover:bg-white/10">上一页</button>
+                        <button class="px-3 py-1 rounded bg-purple-500">1</button>
+                        <button class="px-3 py-1 rounded border border-white/20 hover:bg-white/10">2</button>
+                        <button class="px-3 py-1 rounded border border-white/20 hover:bg-white/10">3</button>
+                        <span class="px-2">...</span>
+                        <button class="px-3 py-1 rounded border border-white/20 hover:bg-white/10">下一页</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Core Code -->
+            <div class="mt-6 p-4 rounded-lg bg-black/30 text-xs">
+                <p class="text-purple-400 font-bold mb-2"><i class="fas fa-code mr-1"></i>核心实现代码</p>
+                <div class="code-block p-3 rounded text-xs overflow-x-auto">
+                    <span class="text-purple-400">@PostMapping</span>("/updateStatus")<br>
+                    <span class="text-blue-400">public</span> Result updateStatus(<br>
+                    &nbsp;&nbsp;@RequestParam Long userId,<br>
+                    &nbsp;&nbsp;@RequestParam String status) {<br>
+                    &nbsp;&nbsp;User user = userService.getById(userId);<br>
+                    &nbsp;&nbsp;user.setStatus(status);<br>
+                    &nbsp;&nbsp;userService.updateById(user);<br>
+                    &nbsp;&nbsp;<span class="text-green-400">return</span> Result.ok(<span class="text-yellow-400">"用户状态更新成功"</span>);<br>
+                    }
+                </div>
+            </div>
+        </section>
+
+        <!-- 5.2.5 演出公告管理功能实现 -->
+        <section id="announcement" class="module-section">
+            <div class="mb-6">
+                <h2 class="text-3xl font-bold mb-2 flex items-center gap-3">
+                    <span class="w-10 h-10 rounded-lg bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center text-lg">5</span>
+                    演出公告管理功能实现
+                </h2>
+                <p class="text-gray-400">管理员发布演出公告、活动通知和规则变更，用户可在首页查看最新公告</p>
+            </div>
+
+            <div class="grid grid-cols-3 gap-6">
+                <!-- Create Announcement -->
+                <div class="col-span-2 glass-card rounded-2xl p-6">
+                    <h3 class="text-xl font-bold mb-4">发布公告</h3>
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-2">公告标题</label>
+                            <input type="text" placeholder="请输入公告标题..." class="w-full p-3 rounded-lg bg-white/5 border border-white/10 text-white" value="关于6月15日星空音乐节演出时间调整的公告">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-2">公告类型</label>
+                            <select class="w-full p-3 rounded-lg bg-white/5 border border-white/10 text-white">
+                                <option>演出通知</option>
+                                <option>活动公告</option>
+                                <option>规则变更</option>
+                                <option>系统维护</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-400 mb-2">公告内容</label>
+                            <textarea rows="8" class="w-full p-3 rounded-lg bg-white/5 border border-white/10 text-white resize-none" placeholder="请输入公告内容...">尊敬的各位用户：
+
+因天气原因，原定于2026年6月15日19:30举行的"2026星空音乐节 - 巨星演唱会"演出时间调整为当日20:00开始。
+
+已购票用户无需进行任何操作，您的门票仍然有效。如需退票，请在6月10日前联系客服办理。
+
+给您带来的不便，我们深表歉意，感谢您的理解与支持！
+
+Star Ticket平台
+2026年5月28日</textarea>
+                        </div>
+                        <div class="flex items-center gap-4">
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" checked class="w-4 h-4 rounded border-white/20">
+                                <span class="text-sm">立即发布</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" class="w-4 h-4 rounded border-white/20">
+                                <span class="text-sm">置顶显示</span>
+                            </label>
+                        </div>
+                        <div class="flex gap-3 pt-4">
+                            <button class="px-6 py-3 rounded-lg bg-gradient-to-r from-pink-500 to-rose-600 font-bold hover:shadow-lg transition-all" onclick="publishNotice()">
+                                <i class="fas fa-paper-plane mr-2"></i>发布公告
+                            </button>
+                            <button class="px-6 py-3 rounded-lg border border-white/20 hover:bg-white/10 transition-colors">
+                                保存草稿
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Announcement List -->
+                <div class="glass-card rounded-2xl p-6">
+                    <h3 class="text-xl font-bold mb-4">已发布公告</h3>
+                    <div class="space-y-4">
+                        <div class="p-4 rounded-lg bg-white/5 border-l-4 border-pink-500">
+                            <div class="flex justify-between items-start mb-2">
+                                <h4 class="font-bold text-sm">6月演出安排公告</h4>
+                                <span class="px-2 py-1 rounded bg-green-500/20 text-green-400 text-xs">已发布</span>
+                            </div>
+                            <p class="text-xs text-gray-400 mb-2">2026-05-25</p>
+                            <div class="flex gap-2">
+                                <button class="text-xs text-cyan-400 hover:underline">编辑</button>
+                                <button class="text-xs text-red-400 hover:underline">删除</button>
+                            </div>
+                        </div>
+                        <div class="p-4 rounded-lg bg-white/5 border-l-4 border-purple-500">
+                            <div class="flex justify-between items-start mb-2">
+                                <h4 class="font-bold text-sm">VIP权益升级通知</h4>
+                                <span class="px-2 py-1 rounded bg-green-500/20 text-green-400 text-xs">已发布</span>
+                            </div>
+                            <p class="text-xs text-gray-400 mb-2">2026-05-20</p>
+                            <div class="flex gap-2">
+                                <button class="text-xs text-cyan-400 hover:underline">编辑</button>
+                                <button class="text-xs text-red-400 hover:underline">删除</button>
+                            </div>
+                        </div>
+                        <div class="p-4 rounded-lg bg-white/5 border-l-4 border-cyan-500">
+                            <div class="flex justify-between items-start mb-2">
+                                <h4 class="font-bold text-sm">五一活动公告</h4>
+                                <span class="px-2 py-1 rounded bg-gray-500/20 text-gray-400 text-xs">已下架</span>
+                            </div>
+                            <p class="text-xs text-gray-400 mb-2">2026-04-28</p>
+                            <div class="flex gap-2">
+                                <button class="text-xs text-cyan-400 hover:underline">编辑</button>
+                                <button class="text-xs text-green-400 hover:underline">重新发布</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Published Preview -->
+            <div class="mt-6 glass-card rounded-2xl p-6">
+                <h3 class="text-xl font-bold mb-4">首页公告展示预览</h3>
+                <div class="bg-black/30 rounded-xl p-4">
+                    <div class="flex items-center gap-3 mb-4 pb-3 border-b border-white/10">
+                        <i class="fas fa-bullhorn text-pink-500"></i>
+                        <span class="font-bold">最新公告</span>
+                    </div>
+                    <div class="space-y-3">
+                        <div class="flex items-start gap-3 p-3 rounded-lg bg-white/5">
+                            <span class="px-2 py-1 rounded bg-red-500/20 text-red-400 text-xs flex-shrink-0">重要</span>
+                            <div>
+                                <h4 class="font-bold text-sm mb-1">关于6月15日星空音乐节演出时间调整的公告</h4>
+                                <p class="text-xs text-gray-400">因天气原因，演出时间调整为当日20:00开始...</p>
+                                <p class="text-xs text-gray-500 mt-2">2026-05-28 10:30</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3 p-3 rounded-lg bg-white/5">
+                            <span class="px-2 py-1 rounded bg-purple-500/20 text-purple-400 text-xs flex-shrink-0">活动</span>
+                            <div>
+                                <h4 class="font-bold text-sm mb-1">6月演出安排公告</h4>
+                                <p class="text-xs text-gray-400">本月将有5场大型演唱会开票，敬请期待...</p>
+                                <p class="text-xs text-gray-500 mt-2">2026-05-25 14:00</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Core Code -->
+            <div class="mt-6 p-4 rounded-lg bg-black/30 text-xs">
+                <p class="text-purple-400 font-bold mb-2"><i class="fas fa-code mr-1"></i>核心实现代码</p>
+                <div class="code-block p-3 rounded text-xs overflow-x-auto">
+                    <span class="text-purple-400">@PostMapping</span>("/publish")<br>
+                    <span class="text-blue-400">public</span> Result publishNotice(@RequestBody Notice notice) {<br>
+                    &nbsp;&nbsp;notice.setPublishTime(LocalDateTime.now());<br>
+                    &nbsp;&nbsp;notice.setStatus(<span class="text-yellow-400">"已发布"</span>);<br>
+                    &nbsp;&nbsp;noticeService.save(notice);<br>
+                    &nbsp;&nbsp;<span class="text-green-400">return</span> Result.ok(<span class="text-yellow-400">"公告发布成功"</span>);<br>
+                    }
+                </div>
+            </div>
+        </section>
+
+        <!-- 5.2.6 数据统计管理功能实现 -->
+        <section id="statistics" class="module-section">
+            <div class="mb-6">
+                <h2 class="text-3xl font-bold mb-2 flex items-center gap-3">
+                    <span class="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-lg">6</span>
+                    数据统计管理功能实现
+                </h2>
+                <p class="text-gray-400">运营数据统计分析，包括售票统计、营收分析、用户增长等多维度数据可视化</p>
+            </div>
+
+            <!-- Stats Overview -->
+            <div class="grid grid-cols-4 gap-4 mb-6">
+                <div class="stat-card rounded-xl p-4">
+                    <p class="text-gray-400 text-sm">总营收 (元)</p>
+                    <p class="text-2xl font-bold text-cyan-400">¥2,856,420</p>
+                    <p class="text-xs text-green-400 mt-1"><i class="fas fa-arrow-up mr-1"></i>+12.5% 较上月</p>
+                </div>
+                <div class="stat-card rounded-xl p-4">
+                    <p class="text-gray-400 text-sm">总售票数</p>
+                    <p class="text-2xl font-bold text-purple-400">12,456</p>
+                    <p class="text-xs text-green-400 mt-1"><i class="fas fa-arrow-up mr-1"></i>+8.3% 较上月</p>
+                </div>
+                <div class="stat-card rounded-xl p-4">
+                    <p class="text-gray-400 text-sm">平均上座率</p>
+                    <p class="text-2xl font-bold text-pink-400">87.5%</p>
+                    <p class="text-xs text-green-400 mt-1"><i class="fas fa-arrow-up mr-1"></i>+5.2% 较上月</p>
+                </div>
+                <div class="stat-card rounded-xl p-4">
+                    <p class="text-gray-400 text-sm">VIP服务使用率</p>
+                    <p class="text-2xl font-bold text-yellow-400">68.2%</p>
+                    <p class="text-xs text-red-400 mt-1"><i class="fas fa-arrow-down mr-1"></i>-2.1% 较上月</p>
+                </div>
+            </div>
+
+            <!-- Charts -->
+            <div class="grid grid-cols-2 gap-6 mb-6">
+                <div class="glass-card rounded-2xl p-6">
+                    <h3 class="text-lg font-bold mb-4">月度营收趋势</h3>
+                    <canvas id="revenueChart" height="200"></canvas>
+                </div>
+                <div class="glass-card rounded-2xl p-6">
+                    <h3 class="text-lg font-bold mb-4">售票量统计</h3>
+                    <canvas id="ticketChart" height="200"></canvas>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-6">
+                <div class="glass-card rounded-2xl p-6">
+                    <h3 class="text-lg font-bold mb-4">用户增长趋势</h3>
+                    <canvas id="userChart" height="200"></canvas>
+                </div>
+                <div class="glass-card rounded-2xl p-6">
+                    <h3 class="text-lg font-bold mb-4">票价档位销售占比</h3>
+                    <canvas id="priceChart" height="200"></canvas>
+                </div>
+            </div>
+
+            <!-- Data Query -->
+            <div class="mt-6 glass-card rounded-2xl p-6">
+                <h3 class="text-lg font-bold mb-4">自定义数据查询</h3>
+                <div class="flex gap-4 mb-4">
+                    <div class="flex-1">
+                        <label class="block text-sm text-gray-400 mb-2">开始日期</label>
+                        <input type="date" value="2026-01-01" class="w-full p-3 rounded-lg bg-white/5 border border-white/10 text-white">
+                    </div>
+                    <div class="flex-1">
+                        <label class="block text-sm text-gray-400 mb-2">结束日期</label>
+                        <input type="date" value="2026-05-31" class="w-full p-3 rounded-lg bg-white/5 border border-white/10 text-white">
+                    </div>
+                    <div class="flex-1">
+                        <label class="block text-sm text-gray-400 mb-2">统计维度</label>
+                        <select class="w-full p-3 rounded-lg bg-white/5 border border-white/10 text-white">
+                            <option>营收统计</option>
+                            <option>售票统计</option>
+                            <option>用户统计</option>
+                            <option>VIP服务统计</option>
+                        </select>
+                    </div>
+                    <div class="flex items-end">
+                        <button class="px-6 py-3 rounded-lg bg-gradient-to-r from-blue-500 to-indigo-600 font-bold hover:shadow-lg transition-all">
+                            <i class="fas fa-chart-line mr-2"></i>生成报表
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Core Code -->
+            <div class="mt-6 p-4 rounded-lg bg-black/30 text-xs">
+                <p class="text-purple-400 font-bold mb-2"><i class="fas fa-code mr-1"></i>核心实现代码</p>
+                <div class="code-block p-3 rounded text-xs overflow-x-auto">
+                    <span class="text-purple-400">@GetMapping</span>("/revenue")<br>
+                    <span class="text-blue-400">public</span> Result getRevenueReport(<br>
+                    &nbsp;&nbsp;@RequestParam String startDate,<br>
+                    &nbsp;&nbsp;@RequestParam String endDate) {<br>
+                    &nbsp;&nbsp;Map&lt;String, Object&gt; report = <br>
+                    &nbsp;&nbsp;&nbsp;&nbsp;statisticsService.generateRevenueReport(startDate, endDate);<br>
+                    &nbsp;&nbsp;<span class="text-green-400">return</span> Result.ok(report);<br>
+                    }
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-8 right-8 glass-card rounded-xl p-4 transform translate-y-20 opacity-0 transition-all duration-300 z-50">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-full bg-gradient-to-br from-green-500 to-teal-500 flex items-center justify-center">
+                <i class="fas fa-check text-white"></i>
+            </div>
+            <div>
+                <p class="font-bold" id="toast-title">成功</p>
+                <p class="text-sm text-gray-400" id="toast-message">操作已完成</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Create floating particles
+        function createParticles() {
+            const container = document.getElementById('particles');
+            for (let i = 0; i < 50; i++) {
+                const particle = document.createElement('div');
+                particle.className = 'particle';
+                particle.style.left = Math.random() * 100 + '%';
+                particle.style.animationDelay = Math.random() * 10 + 's';
+                particle.style.animationDuration = (Math.random() * 10 + 10) + 's';
+                container.appendChild(particle);
+            }
+        }
+        createParticles();
+
+        // Module switching
+        function showModule(moduleId) {
+            // Hide all sections
+            document.querySelectorAll('.module-section').forEach(section => {
+                section.classList.remove('active');
+            });
+            // Show selected section
+            document.getElementById(moduleId).classList.add('active');
+            // Update nav tabs
+            document.querySelectorAll('.nav-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelector(`[data-module="${moduleId}"]`).classList.add('active');
+
+            // Initialize charts if statistics module
+            if (moduleId === 'statistics') {
+                setTimeout(initCharts, 100);
+            }
+        }
+
+        // Seat Map Generation
+        function generateSeatMap() {
+            const seatMap = document.getElementById('seat-map');
+            const rows = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+            const cols = 12;
+            
+            rows.forEach((row, rowIndex) => {
+                const rowDiv = document.createElement('div');
+                rowDiv.className = 'flex justify-center gap-1';
+                
+                // Row label
+                const label = document.createElement('span');
+                label.className = 'w-8 text-center text-sm text-gray-400 leading-8';
+                label.textContent = row;
+                rowDiv.appendChild(label);
+                
+                // Seats
+                for (let i = 1; i <= cols; i++) {
+                    const seat = document.createElement('div');
+                    const isOccupied = Math.random() < 0.3;
+                    seat.className = `seat w-8 h-8 rounded ${isOccupied ? 'occupied' : 'bg-cyan-400/20 border border-cyan-400/50'}`;
+                    seat.dataset.seat = `${row}${i}`;
+                    seat.dataset.price = rowIndex < 2 ? '1680' : rowIndex < 4 ? '980' : rowIndex < 6 ? '680' : '280';
+                    
+                    if (!isOccupied) {
+                        seat.onclick = () => toggleSeat(seat);
+                    }
+                    
+                    rowDiv.appendChild(seat);
+                }
+                
+                seatMap.appendChild(rowDiv);
+            });
+        }
+
+        let selectedSeats = [];
+
+        function toggleSeat(seat) {
+            const seatId = seat.dataset.seat;
+            const price = parseInt(seat.dataset.price);
+            
+            if (seat.classList.contains('selected')) {
+                seat.classList.remove('selected');
+                seat.classList.add('bg-cyan-400/20');
+                selectedSeats = selectedSeats.filter(s => s.id !== seatId);
+            } else {
+                if (selectedSeats.length >= 4) {
+                    showToast('提示', '最多只能选择4个座位');
+                    return;
+                }
+                seat.classList.add('selected');
+                seat.classList.remove('bg-cyan-400/20');
+                selectedSeats.push({ id: seatId, price: price });
+            }
+            
+            updateOrderSummary();
+        }
+
+        function updateOrderSummary() {
+            const container = document.getElementById('selected-seats');
+            const countEl = document.getElementById('seat-count');
+            const priceEl = document.getElementById('total-price');
+            const submitBtn = document.getElementById('submit-order');
+            
+            if (selectedSeats.length === 0) {
+                container.innerHTML = '<p class="text-gray-400 text-sm">请选择座位</p>';
+                countEl.textContent = '0';
+                priceEl.textContent = '¥0';
+                submitBtn.disabled = true;
+            } else {
+                container.innerHTML = selectedSeats.map(seat => `
+                    <div class="flex justify-between items-center p-2 rounded bg-white/5 text-sm">
+                        <span>${seat.id} 区</span>
+                        <span class="text-cyan-400">¥${seat.price}</span>
+                    </div>
+                `).join('');
+                countEl.textContent = selectedSeats.length;
+                priceEl.textContent = '¥' + selectedSeats.reduce((sum, s) => sum + s.price, 0);
+                submitBtn.disabled = false;
+            }
+        }
+
+        function createOrder() {
+            showToast('成功', '订单创建成功！正在跳转支付页面...');
+        }
+
+        // Payment simulation
+        function simulatePayment() {
+            const progress = document.getElementById('payment-progress');
+            const status = document.getElementById('payment-status');
+            
+            progress.style.width = '0%';
+            status.classList.add('hidden');
+            
+            setTimeout(() => {
+                progress.style.width = '30%';
+            }, 300);
+            
+            setTimeout(() => {
+                progress.style.width = '70%';
+            }, 800);
+            
+            setTimeout(() => {
+                progress.style.width = '100%';
+            }, 1200);
+            
+            setTimeout(() => {
+                status.classList.remove('hidden');
+                showToast('支付成功', '订单状态已更新为"已支付"');
+            }, 1500);
+        }
+
+        function payOrder(btn) {
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>处理中...';
+            setTimeout(() => {
+                btn.innerHTML = '<i class="fas fa-check mr-2"></i>已支付';
+                btn.classList.remove('from-pink-500', 'to-purple-600');
+                btn.classList.add('bg-green-500');
+                showToast('支付成功', '订单已完成支付');
+            }, 1500);
+        }
+
+        // VIP Booking Modal
+        function showBookingModal(packageName) {
+            document.getElementById('booking-package-name').textContent = packageName;
+            document.getElementById('booking-modal').classList.remove('hidden');
+            document.getElementById('booking-modal').classList.add('flex');
+        }
+
+        function closeBookingModal() {
+            document.getElementById('booking-modal').classList.add('hidden');
+            document.getElementById('booking-modal').classList.remove('flex');
+        }
+
+        function submitBooking() {
+            closeBookingModal();
+            showToast('预约成功', '您的VIP权益预约已提交，等待管理员审核');
+        }
+
+        // Notice publish
+        function publishNotice() {
+            showToast('发布成功', '公告已成功发布，用户可在首页查看');
+        }
+
+        // Toast notification
+        function showToast(title, message) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-title').textContent = title;
+            document.getElementById('toast-message').textContent = message;
+            
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+
+        // Initialize Charts
+        function initCharts() {
+            // Revenue Chart
+            const revenueCtx = document.getElementById('revenueChart');
+            if (revenueCtx) {
+                new Chart(revenueCtx, {
+                    type: 'line',
+                    data: {
+                        labels: ['1月', '2月', '3月', '4月', '5月'],
+                        datasets: [{
+                            label: '月度营收 (万元)',
+                            data: [45, 52, 48, 65, 72],
+                            borderColor: '#00f5ff',
+                            backgroundColor: 'rgba(0, 245, 255, 0.1)',
+                            fill: true,
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { labels: { color: '#fff' } }
+                        },
+                        scales: {
+                            y: { ticks: { color: '#888' }, grid: { color: '#333' } },
+                            x: { ticks: { color: '#888' }, grid: { color: '#333' } }
+                        }
+                    }
+                });
+            }
+
+            // Ticket Chart
+            const ticketCtx = document.getElementById('ticketChart');
+            if (ticketCtx) {
+                new Chart(ticketCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: ['1月', '2月', '3月', '4月', '5月'],
+                        datasets: [{
+                            label: '售票量',
+                            data: [1800, 2200, 1950, 2800, 3100],
+                            backgroundColor: 'rgba(131, 56, 236, 0.8)'
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { labels: { color: '#fff' } }
+                        },
+                        scales: {
+                            y: { ticks: { color: '#888' }, grid: { color: '#333' } },
+                            x: { ticks: { color: '#888' }, grid: { color: '#333' } }
+                        }
+                    }
+                });
+            }
+
+            // User Chart
+            const userCtx = document.getElementById('userChart');
+            if (userCtx) {
+                new Chart(userCtx, {
+                    type: 'line',
+                    data: {
+                        labels: ['1月', '2月', '3月', '4月', '5月'],
+                        datasets: [{
+                            label: '新增用户',
+                            data: [320, 450, 380, 520, 580],
+                            borderColor: '#ff006e',
+                            backgroundColor: 'rgba(255, 0, 110, 0.1)',
+                            fill: true,
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { labels: { color: '#fff' } }
+                        },
+                        scales: {
+                            y: { ticks: { color: '#888' }, grid: { color: '#333' } },
+                            x: { ticks: { color: '#888' }, grid: { color: '#333' } }
+                        }
+                    }
+                });
+            }
+
+            // Price Chart
+            const priceCtx = document.getElementById('priceChart');
+            if (priceCtx) {
+                new Chart(priceCtx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: ['VIP区 ¥1680', 'A区 ¥980', 'B区 ¥680', 'C区 ¥280'],
+                        datasets: [{
+                            data: [25, 35, 28, 12],
+                            backgroundColor: [
+                                '#ffd700',
+                                '#8338ec',
+                                '#3a86ff',
+                                '#00f5ff'
+                            ]
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { 
+                                position: 'right',
+                                labels: { color: '#fff' } 
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            generateSeatMap();
+        });
+    </script>
+</body>
+</html>
