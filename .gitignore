@@ -11,11 +11,3 @@ frontend/node_modules/
 frontend/dist/
 frontend/.env.local
 frontend/*.local
-
-# Other
-figures/
-.gitignore
-211040600424--刘旭--面向公众的微服务架构法律咨询服务平台设计与开发--BS.docx
-陈雨洁-论文.docx
-陈雨洁-论文.md
-陈雨洁-任务书.docx
