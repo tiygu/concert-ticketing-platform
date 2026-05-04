@@ -1,0 +1,13 @@
+# Claude
+.claude/
+.agents/
+skills-lock.json
+
+# Backend
+backend/target/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env.local
+frontend/*.local
